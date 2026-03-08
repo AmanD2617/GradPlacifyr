@@ -1,18 +1,55 @@
-import { useState, type MouseEvent } from 'react'
+import { useState, type MouseEvent, type ChangeEvent } from 'react'
 import { generateResume, type GeneratedResume } from '../../api/ai'
+import { parseResume, type ParsedResumeProfile } from '../../api/resume'
 import '../shared/WorkPages.css'
 
 const StudentUploadResumePage = () => {
   const [fileName, setFileName] = useState<string | null>(null)
+  const [file, setFile] = useState<File | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [linkedInUrl, setLinkedInUrl] = useState('')
   const [profileText, setProfileText] = useState('')
   const [aiResume, setAiResume] = useState<GeneratedResume | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
+  const [parsing, setParsing] = useState(false)
+  const [parsedProfile, setParsedProfile] = useState<ParsedResumeProfile | null>(null)
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const nextFile = e.target.files?.[0] ?? null
+    setFile(nextFile)
+    setFileName(nextFile ? nextFile.name : null)
+    setMessage(null)
+  }
 
   const handleUploadClick = () => {
     setMessage(fileName ? 'Resume attached (demo state).' : 'Please select a PDF file.')
+  }
+
+  const handleParseResume = async () => {
+    setAiError(null)
+    setMessage(null)
+    setParsedProfile(null)
+    if (!file) {
+      setAiError('Select a PDF resume first.')
+      return
+    }
+    try {
+      setParsing(true)
+      const result = await parseResume(file)
+      setParsedProfile(result)
+      localStorage.setItem('parsed_resume_profile', JSON.stringify(result))
+      setMessage('AI has suggested skills and experience from your resume. Review them below and on the Edit Profile page.')
+    } catch (err: unknown) {
+      const raw = err instanceof Error ? err.message : 'Failed to parse resume.'
+      const msg =
+        raw === 'Failed to fetch'
+          ? 'Cannot reach resume parser API. Ensure the backend server is running.'
+          : raw
+      setAiError(msg)
+    } finally {
+      setParsing(false)
+    }
   }
 
   const handleGenerate = async (e: MouseEvent<HTMLButtonElement>) => {
@@ -126,10 +163,7 @@ const StudentUploadResumePage = () => {
             <input
               type="file"
               accept=".pdf"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                setFileName(file ? file.name : null)
-              }}
+              onChange={handleFileChange}
             />
           </label>
           {fileName && <p className="work-muted">Selected file: {fileName}</p>}
@@ -139,6 +173,14 @@ const StudentUploadResumePage = () => {
             onClick={handleUploadClick}
           >
             Upload
+          </button>
+          <button
+            className="work-btn secondary"
+            type="button"
+            disabled={parsing}
+            onClick={handleParseResume}
+          >
+            {parsing ? 'Parsing resume…' : 'Let AI parse resume'}
           </button>
           {message && <p className="work-success">{message}</p>}
         </div>
@@ -178,6 +220,54 @@ const StudentUploadResumePage = () => {
           </button>
         </form>
       </article>
+
+      {parsedProfile && (
+        <article className="work-card">
+          <h2>Parsed Resume Suggestions</h2>
+          <p className="work-muted">
+            These are AI-suggested fields from your resume. You can review and refine them on the
+            <strong> Edit Profile</strong> page before saving.
+          </p>
+          <div className="work-grid-2">
+            <div>
+              <h3>Programming Languages</h3>
+              <p>{parsedProfile.programmingLanguages.join(', ') || '—'}</p>
+              <h3>Frameworks</h3>
+              <p>{parsedProfile.frameworks.join(', ') || '—'}</p>
+              <h3>Tools</h3>
+              <p>{parsedProfile.tools.join(', ') || '—'}</p>
+            </div>
+            <div>
+              <h3>Certifications</h3>
+              <ul>
+                {parsedProfile.certifications.length === 0 ? (
+                  <li className="work-muted">None detected</li>
+                ) : (
+                  parsedProfile.certifications.map((c) => <li key={c}>{c}</li>)
+                )}
+              </ul>
+              <h3>Projects</h3>
+              <ul>
+                {parsedProfile.projects.length === 0 ? (
+                  <li className="work-muted">None detected</li>
+                ) : (
+                  parsedProfile.projects.map((p) => <li key={p}>{p}</li>)
+                )}
+              </ul>
+            </div>
+          </div>
+          <h3>Internship Experience</h3>
+          <p>{parsedProfile.internshipExperience || '—'}</p>
+          <h3>Achievements</h3>
+          <ul>
+            {parsedProfile.achievements.length === 0 ? (
+              <li className="work-muted">None detected</li>
+            ) : (
+              parsedProfile.achievements.map((a) => <li key={a}>{a}</li>)
+            )}
+          </ul>
+        </article>
+      )}
 
       {aiResume && (
         <article className="work-card">

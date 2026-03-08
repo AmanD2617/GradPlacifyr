@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { getMyProfile, updateMyProfile, type StudentProfile } from '../../api/profile'
+import type { ParsedResumeProfile } from '../../api/resume'
 import '../shared/WorkPages.css'
 
 const emptyProfile: StudentProfile = {
@@ -26,6 +27,8 @@ const StudentEditProfilePage = () => {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [resumeSuggestions, setResumeSuggestions] = useState<ParsedResumeProfile | null>(null)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(true)
 
   useEffect(() => {
     getMyProfile()
@@ -35,6 +38,17 @@ const StudentEditProfilePage = () => {
         setError(msg)
       })
       .finally(() => setLoading(false))
+
+    const stored = localStorage.getItem('parsed_resume_profile')
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as ParsedResumeProfile
+        setResumeSuggestions(parsed)
+      } catch {
+        // ignore corrupted storage
+      }
+    }
+    setLoadingSuggestions(false)
   }, [])
 
   const onChangeNumber =
@@ -88,6 +102,12 @@ const StudentEditProfilePage = () => {
             {editing ? 'View Mode' : 'Edit Mode'}
           </button>
         </div>
+        {!loadingSuggestions && resumeSuggestions && (
+          <p className="work-muted" style={{ marginTop: '0.5rem' }}>
+            We found AI-based suggestions from your latest resume upload. Use the{" "}
+            <strong>&quot;Apply AI Suggestions&quot;</strong> buttons in the form to merge them into your profile.
+          </p>
+        )}
       </article>
 
       <article className="work-card">
@@ -178,6 +198,25 @@ const StudentEditProfilePage = () => {
                   value={profile.programmingLanguages}
                   onChange={onChangeText('programmingLanguages')}
                 />
+                {resumeSuggestions?.programmingLanguages?.length ? (
+                  <button
+                    type="button"
+                    className="work-chip-btn"
+                    onClick={() =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        programmingLanguages: [
+                          prev.programmingLanguages,
+                          resumeSuggestions.programmingLanguages.join(', '),
+                        ]
+                          .filter(Boolean)
+                          .join(', '),
+                      }))
+                    }
+                  >
+                    Apply AI Suggestions
+                  </button>
+                ) : null}
               </label>
               <label>
                 Frameworks
@@ -186,6 +225,25 @@ const StudentEditProfilePage = () => {
                   value={profile.frameworks}
                   onChange={onChangeText('frameworks')}
                 />
+                {resumeSuggestions?.frameworks?.length ? (
+                  <button
+                    type="button"
+                    className="work-chip-btn"
+                    onClick={() =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        frameworks: [
+                          prev.frameworks,
+                          resumeSuggestions.frameworks.join(', '),
+                        ]
+                          .filter(Boolean)
+                          .join(', '),
+                      }))
+                    }
+                  >
+                    Apply AI Suggestions
+                  </button>
+                ) : null}
               </label>
             </div>
 
@@ -197,6 +255,22 @@ const StudentEditProfilePage = () => {
                   value={profile.tools}
                   onChange={onChangeText('tools')}
                 />
+                {resumeSuggestions?.tools?.length ? (
+                  <button
+                    type="button"
+                    className="work-chip-btn"
+                    onClick={() =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        tools: [prev.tools, resumeSuggestions.tools.join(', ')]
+                          .filter(Boolean)
+                          .join(', '),
+                      }))
+                    }
+                  >
+                    Apply AI Suggestions
+                  </button>
+                ) : null}
               </label>
               <label>
                 Certifications
@@ -205,6 +279,25 @@ const StudentEditProfilePage = () => {
                   value={profile.certifications}
                   onChange={onChangeText('certifications')}
                 />
+                {resumeSuggestions?.certifications?.length ? (
+                  <button
+                    type="button"
+                    className="work-chip-btn"
+                    onClick={() =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        certifications: [
+                          prev.certifications,
+                          resumeSuggestions.certifications.join(', '),
+                        ]
+                          .filter(Boolean)
+                          .join(', '),
+                      }))
+                    }
+                  >
+                    Apply AI Suggestions
+                  </button>
+                ) : null}
               </label>
             </div>
 
@@ -215,6 +308,25 @@ const StudentEditProfilePage = () => {
                 value={profile.internshipExperience}
                 onChange={onChangeText('internshipExperience')}
               />
+              {resumeSuggestions?.internshipExperience ? (
+                <button
+                  type="button"
+                  className="work-chip-btn"
+                  onClick={() =>
+                    setProfile((prev) => ({
+                      ...prev,
+                      internshipExperience: [
+                        prev.internshipExperience,
+                        resumeSuggestions.internshipExperience,
+                      ]
+                        .filter(Boolean)
+                        .join('\n'),
+                    }))
+                  }
+                >
+                  Apply AI Suggestions
+                </button>
+              ) : null}
             </label>
 
             <label>
@@ -224,6 +336,25 @@ const StudentEditProfilePage = () => {
                 value={profile.achievements}
                 onChange={onChangeText('achievements')}
               />
+              {resumeSuggestions?.achievements?.length ? (
+                <button
+                  type="button"
+                  className="work-chip-btn"
+                  onClick={() =>
+                    setProfile((prev) => ({
+                      ...prev,
+                      achievements: [
+                        prev.achievements,
+                        resumeSuggestions.achievements.join('\n'),
+                      ]
+                        .filter(Boolean)
+                        .join('\n'),
+                    }))
+                  }
+                >
+                  Apply AI Suggestions
+                </button>
+              ) : null}
             </label>
 
             <div className="work-grid-3">

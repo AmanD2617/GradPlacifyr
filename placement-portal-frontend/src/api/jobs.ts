@@ -8,6 +8,10 @@ export interface Job {
   location: string | null
   status: string
   created_at: string
+  description?: string
+  requirements?: string
+  deadline?: string
+  employmentType?: string
 }
 
 export async function getJobs(): Promise<Job[]> {

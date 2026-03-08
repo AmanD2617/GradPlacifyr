@@ -14,7 +14,10 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
     "mysql2": "^3.11.0",
-    "openai": "^6.25.0"
+    "nodemailer": "^8.0.1",
+    "openai": "^6.25.0",
+    "pdf-parse": "^1.1.1"
   }
 }

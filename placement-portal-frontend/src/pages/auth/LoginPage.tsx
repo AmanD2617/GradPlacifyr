@@ -56,7 +56,7 @@ const LoginPage = () => {
             <input
               type="password"
               className="auth-input"
-              placeholder="••••••••"
+              placeholder="********"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -75,11 +75,7 @@ const LoginPage = () => {
             </select>
           </label>
 
-          {error && (
-            <div className="auth-error">
-              {error}
-            </div>
-          )}
+          {error && <div className="auth-error">{error}</div>}
 
           <button type="submit" className="auth-button primary" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign in'}
@@ -88,6 +84,9 @@ const LoginPage = () => {
 
         <p className="auth-footer-text">
           New user? <Link to="/register">Create an account</Link>
+        </p>
+        <p className="auth-footer-text auth-footer-forgot">
+          <Link to="/forgot-password">Forgot Password?</Link>
         </p>
       </div>
     </div>

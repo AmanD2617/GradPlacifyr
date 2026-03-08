@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('student','admin','recruiter','hod') NOT NULL DEFAULT 'student',
   name VARCHAR(255),
+  reset_password_token VARCHAR(255) DEFAULT NULL,
+  reset_password_expire DATETIME DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

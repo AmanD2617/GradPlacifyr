@@ -2,6 +2,7 @@ import { Router } from 'express'
 import pool from '../db/connection.js'
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js'
 import { AppError } from '../utils/appError.js'
+import { buildCompanyJobScope } from '../utils/jobOwnerColumn.js'
 
 const router = Router()
 
@@ -107,8 +108,9 @@ router.get(
       const whereParts = []
 
       if (req.user.role === 'company') {
-        whereParts.push('j.created_by = ?')
-        params.push(req.user.id)
+        const scope = await buildCompanyJobScope('j', req.user.id)
+        whereParts.push(scope.clause)
+        params.push(...scope.params)
       }
 
       if (jobId) {
@@ -157,12 +159,13 @@ router.patch(
 
       let result
       if (req.user.role === 'company') {
+        const scope = await buildCompanyJobScope('j', req.user.id)
         ;[result] = await pool.execute(
           `UPDATE applications a
            JOIN jobs j ON j.id = a.job_id
            SET a.status = ?
-           WHERE a.id = ? AND j.created_by = ?`,
-          [status, req.params.id, req.user.id]
+           WHERE a.id = ? AND ${scope.clause}`,
+          [status, req.params.id, ...scope.params]
         )
       } else {
         ;[result] = await pool.execute(

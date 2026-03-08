@@ -107,6 +107,22 @@
   font-size: 0.9rem;
 }
 
+.work-chip-btn {
+  margin-top: 0.3rem;
+  align-self: flex-start;
+  border-radius: 999px;
+  border: 1px dashed var(--jims-border);
+  background: #f5faff;
+  color: var(--jims-maroon-dark);
+  font-size: 0.78rem;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+}
+
+.work-chip-btn:hover {
+  background: #e0edff;
+}
+
 @media (max-width: 860px) {
   .work-grid-2 {
     grid-template-columns: 1fr;

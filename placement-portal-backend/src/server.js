@@ -7,6 +7,7 @@ import applicationsRoutes from './routes/applications.js'
 import usersRoutes from './routes/users.js'
 import aiRoutes from './routes/ai.js'
 import profileRoutes from './routes/profile.js'
+import studentRoutes from './routes/student.js'
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js'
 
 const app = express()
@@ -21,6 +22,7 @@ app.use('/api/applications', applicationsRoutes)
 app.use('/api/users', usersRoutes)
 app.use('/api/ai', aiRoutes)
 app.use('/api/profile', profileRoutes)
+app.use('/api/student', studentRoutes)
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, message: 'Placement Portal API' })

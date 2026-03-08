@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --jims-maroon: #1f4b9c;
   --jims-maroon-dark: #20468b;
@@ -9,33 +13,20 @@
   --jims-border: #eaeaea;
   --jims-success: #1f7a4f;
   --jims-danger: #b4232a;
-  font-family: Poppins, 'Segoe UI', Tahoma, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: var(--jims-ink);
-  background-color: var(--jims-bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-*,
-*::before,
-*::after {
+* {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  font-family: Poppins, 'Segoe UI', Tahoma, sans-serif;
   background: var(--jims-bg);
+  color: #0f172a;
 }
 
 a {
   color: inherit;
   text-decoration: none;
-}
-
-button {
-  font-family: inherit;
 }

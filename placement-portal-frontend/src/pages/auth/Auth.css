@@ -237,3 +237,29 @@
   }
 }
 
+
+.auth-forgot-link {
+  margin-top: 0.25rem;
+  font-size: 0.84rem;
+  color: var(--jims-maroon);
+  text-align: right;
+  font-weight: 500;
+}
+
+.auth-forgot-link:hover {
+  text-decoration: underline;
+}
+
+.auth-success {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid #16a34a;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.85rem;
+}
+
+.auth-footer-forgot {
+  margin-top: 0.35rem;
+}

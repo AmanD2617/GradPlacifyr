@@ -94,11 +94,6 @@ const PortalLayout = () => {
         </nav>
 
         <div className="portal-sidebar-footer">
-          {user?.role !== 'student' && (
-            <Link to="/" className="portal-secondary-link">
-              Public Site
-            </Link>
-          )}
           <button className="portal-logout-btn" onClick={logout} type="button">
             Log Out
           </button>
@@ -161,3 +156,4 @@ const PortalLayout = () => {
 }
 
 export default PortalLayout
+

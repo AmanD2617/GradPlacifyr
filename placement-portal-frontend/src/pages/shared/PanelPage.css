@@ -39,3 +39,28 @@
   padding-left: 1rem;
   color: var(--jims-ink-soft);
 }
+
+.job-details-layout {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.2fr);
+  align-items: flex-start;
+}
+
+.job-details-sidebar {
+  border-radius: 0.9rem;
+  border: 1px solid var(--jims-border);
+  padding: 0.8rem;
+  background: #fbfdff;
+}
+
+.job-details-sidebar h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+
+@media (max-width: 800px) {
+  .job-details-layout {
+    grid-template-columns: 1fr;
+  }
+}

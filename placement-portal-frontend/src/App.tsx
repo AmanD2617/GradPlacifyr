@@ -3,6 +3,8 @@ import { AuthProvider } from './context/AuthContext'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import RoleSelectionPage from './pages/auth/RoleSelectionPage'
 import ProtectedRoute from './components/routing/ProtectedRoute'
 import PortalLayout from './components/layout/PortalLayout'
@@ -89,6 +91,8 @@ function App() {
           <Route path="/role-selection" element={<RoleSelectionPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
           <Route path="/recruiter/dashboard" element={<Navigate to="/company/dashboard" replace />} />
 
           <Route element={<ProtectedRoute allowedRoles={['student', 'recruiter', 'admin', 'hod']} />}>
