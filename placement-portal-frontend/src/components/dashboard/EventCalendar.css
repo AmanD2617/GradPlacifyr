@@ -1,0 +1,757 @@
+/* ══════════════════════════════════════════════════════════════════════
+   EventCalendar — Premium split-layout calendar (Reference UI match)
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Gradient wrapper background ── */
+.ecal-wrapper {
+  background: linear-gradient(135deg, #0f766e 0%, #1e40af 45%, #7c3aed 100%);
+  border-radius: 1.1rem;
+  padding: 1.1rem;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Decorative glow orbs behind card */
+.ecal-wrapper::before,
+.ecal-wrapper::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.ecal-wrapper::before {
+  width: 260px;
+  height: 260px;
+  background: #06b6d4;
+  top: -60px;
+  left: -40px;
+}
+
+.ecal-wrapper::after {
+  width: 200px;
+  height: 200px;
+  background: #c084fc;
+  bottom: -50px;
+  right: -30px;
+}
+
+/* ── Main split card ── */
+.ecal-root {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.3),
+    0 8px 20px rgba(0, 0, 0, 0.15);
+  flex: 1;
+  min-height: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LEFT PANEL — Calendar
+   ═══════════════════════════════════════════════════════════ */
+.ecal-calendar {
+  background: rgba(226, 232, 240, 0.92);
+  backdrop-filter: blur(12px);
+  padding: 1rem 1.15rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Year navigation row  — prev year | MONTH, YEAR | next year */
+.ecal-year-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  margin-bottom: 0.65rem;
+}
+
+.ecal-year-btn {
+  border: none;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.35rem;
+  transition: all 0.2s;
+}
+
+.ecal-year-prev {
+  color: #0d9488;
+}
+
+.ecal-year-next {
+  color: #0d9488;
+}
+
+.ecal-year-btn:hover {
+  background: rgba(13, 148, 136, 0.1);
+  transform: translateY(-1px);
+}
+
+.ecal-month-label {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+/* Month chevron arrows — positioned over the calendar header */
+.ecal-month-nav {
+  position: absolute;
+  top: 1rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.ecal-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #475569;
+  pointer-events: auto;
+  transition: all 0.2s;
+}
+
+.ecal-nav-btn:hover {
+  background: rgba(71, 85, 105, 0.1);
+  color: #1e293b;
+  transform: scale(1.12);
+}
+
+/* Day name headers */
+.ecal-day-names {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.2rem;
+  padding-bottom: 0.3rem;
+}
+
+/* ── Calendar date grid ── */
+.ecal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  row-gap: 2px;
+}
+
+.ecal-cell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.76rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+
+.ecal-cell:hover:not(.ecal-empty) {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+  transform: scale(1.15);
+}
+
+.ecal-empty {
+  cursor: default;
+}
+
+/* Today — solid blue circle */
+.ecal-today {
+  font-weight: 700;
+  color: #fff;
+  background: #3b82f6;
+  box-shadow: 0 3px 12px rgba(59, 130, 246, 0.4);
+}
+
+.ecal-today:hover:not(.ecal-empty) {
+  background: #2563eb;
+  color: #fff;
+  transform: scale(1.15);
+}
+
+/* Selected date — slightly different highlight */
+.ecal-selected {
+  background: #1e40af !important;
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: 0 3px 12px rgba(30, 64, 175, 0.45);
+  transform: scale(1.15);
+}
+
+/* Has events indicator */
+.ecal-has-events {
+  font-weight: 600;
+}
+
+/* Event dot — coral/salmon like reference */
+.ecal-dot {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f87171;
+  box-shadow: 0 0 4px rgba(248, 113, 113, 0.5);
+}
+
+.ecal-today .ecal-dot {
+  background: #fbbf24;
+  box-shadow: 0 0 4px rgba(251, 191, 36, 0.5);
+}
+
+.ecal-selected .ecal-dot {
+  background: #93c5fd;
+}
+
+/* ── Bottom action buttons (reference-style pill buttons) ── */
+.ecal-bottom-bar {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  display: flex;
+  justify-content: center;
+  gap: 0.65rem;
+}
+
+.ecal-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: #334155;
+  color: #e2e8f0;
+  border-radius: 1.5rem;
+  padding: 0.38rem 0.85rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.ecal-action-btn:hover {
+  background: #1e293b;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RIGHT PANEL — Dark Events Sidebar
+   ═══════════════════════════════════════════════════════════ */
+.ecal-sidebar {
+  background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ecal-sidebar-header {
+  padding: 0.85rem 0.85rem 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ecal-sidebar-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #e2e8f0;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  position: relative;
+  padding-bottom: 0.55rem;
+}
+
+/* Neon accent underline on title */
+.ecal-sidebar-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #06b6d4, #3b82f6);
+  border-radius: 2px;
+  box-shadow: 0 0 6px rgba(6, 182, 212, 0.4);
+}
+
+.ecal-sidebar-subtitle {
+  margin: 0;
+  padding: 0 0.85rem 0.25rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.ecal-close-sel {
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  color: #f87171;
+  padding: 0.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.ecal-close-sel:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
+  transform: rotate(90deg);
+}
+
+.ecal-sidebar-body {
+  padding: 0.35rem 0.75rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Empty state ── */
+.ecal-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 0.75rem;
+  text-align: center;
+  color: #475569;
+  gap: 0.6rem;
+}
+
+.ecal-empty-state p {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+/* Loading spinner */
+.ecal-loader {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(6, 182, 212, 0.2);
+  border-top-color: #06b6d4;
+  border-radius: 50%;
+  animation: ecal-spin 0.6s linear infinite;
+}
+
+@keyframes ecal-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Event list ── */
+.ecal-event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.ecal-event-item {
+  display: flex;
+  align-items: stretch;
+  gap: 0.65rem;
+  padding: 0.7rem 0.55rem;
+  border-radius: 0.4rem;
+  transition: background 0.2s;
+  cursor: default;
+  position: relative;
+}
+
+.ecal-event-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Neon accent underline under each event */
+.ecal-event-accent {
+  display: none; /* accent is now via bottom border */
+}
+
+.ecal-event-item::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0.55rem;
+  right: 0.55rem;
+  height: 1.5px;
+  background: linear-gradient(90deg, #06b6d4, transparent 80%);
+  opacity: 0.4;
+}
+
+.ecal-event-item:last-child::after {
+  display: none;
+}
+
+.ecal-event-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ecal-event-info strong {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+.ecal-event-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.ecal-event-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.66rem;
+  color: #64748b;
+}
+
+.ecal-event-desc {
+  font-size: 0.68rem;
+  color: #64748b;
+  margin: 0.1rem 0 0;
+  line-height: 1.35;
+}
+
+/* Action buttons (edit/delete) */
+.ecal-event-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+
+.ecal-event-item:hover .ecal-event-actions {
+  opacity: 1;
+}
+
+.ecal-event-actions button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 0.3rem;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  transition: all 0.15s;
+}
+
+.ecal-event-actions button:hover {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+}
+
+.ecal-event-actions .ecal-delete-btn:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
+}
+
+/* Add event on selected date */
+.ecal-add-date-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  border: 1px dashed rgba(6, 182, 212, 0.25);
+  background: transparent;
+  color: #64748b;
+  border-radius: 0.5rem;
+  padding: 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.65rem;
+  width: 100%;
+  transition: all 0.2s;
+}
+
+.ecal-add-date-btn:hover {
+  border-color: #06b6d4;
+  color: #06b6d4;
+  background: rgba(6, 182, 212, 0.05);
+}
+
+/* Sidebar footer — EDIT link like reference */
+.ecal-sidebar-footer {
+  padding: 0.65rem 1.15rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ecal-edit-link {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.3rem;
+  transition: all 0.2s;
+}
+
+.ecal-edit-link:hover {
+  color: #06b6d4;
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.ecal-edit-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f87171;
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
+  cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL — Create / Edit Event
+   ═══════════════════════════════════════════════════════════ */
+.ecal-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.ecal-modal {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow:
+    0 25px 50px rgba(0, 0, 0, 0.25),
+    0 8px 16px rgba(0, 0, 0, 0.1);
+  display: grid;
+  gap: 0.85rem;
+  animation: ecal-modal-in 0.25s ease-out;
+}
+
+@keyframes ecal-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ecal-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ecal-modal-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.ecal-modal-head button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0.25rem;
+  border-radius: 0.4rem;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s;
+}
+
+.ecal-modal-head button:hover {
+  background: #f1f5f9;
+}
+
+.ecal-modal label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.ecal-modal input,
+.ecal-modal textarea {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.84rem;
+  color: #1e293b;
+  background: #fafbfc;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.ecal-modal input:focus,
+.ecal-modal textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ecal-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.ecal-form-error {
+  font-size: 0.78rem;
+  color: #dc2626;
+  margin: 0;
+}
+
+.ecal-submit-btn {
+  border: none;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  color: #fff;
+  border-radius: 0.55rem;
+  padding: 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.ecal-submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+}
+
+.ecal-submit-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE — Stack on mobile
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 700px) {
+  .ecal-wrapper {
+    padding: 1rem;
+    border-radius: 0.85rem;
+  }
+
+  .ecal-root {
+    grid-template-columns: 1fr;
+  }
+
+  .ecal-calendar {
+    padding: 1.1rem 1rem 0.85rem;
+    border-radius: 0.85rem 0.85rem 0 0;
+  }
+
+  .ecal-sidebar {
+    border-radius: 0 0 0.85rem 0.85rem;
+  }
+
+  .ecal-sidebar-body {
+    max-height: 220px;
+  }
+
+  .ecal-month-nav {
+    top: 1.2rem;
+    left: 0.65rem;
+    right: 0.65rem;
+  }
+
+  .ecal-bottom-bar {
+    flex-wrap: wrap;
+  }
+
+  .ecal-action-btn {
+    font-size: 0.65rem;
+    padding: 0.4rem 0.75rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .ecal-wrapper {
+    padding: 0.65rem;
+  }
+
+  .ecal-calendar {
+    padding: 0.85rem 0.7rem 0.65rem;
+  }
+
+  .ecal-year-row {
+    gap: 0.75rem;
+  }
+
+  .ecal-cell {
+    font-size: 0.72rem;
+  }
+}

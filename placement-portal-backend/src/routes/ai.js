@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import OpenAI from 'openai'
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js'
-import pool from '../db/connection.js'
+import prisma from '../db/prisma.js'
 import { AppError } from '../utils/appError.js'
 
 const router = Router()
@@ -60,12 +60,17 @@ router.post(
 
       if (save && req.user.role === 'student') {
         const resumeJson = JSON.stringify(parsed)
-        await pool.execute(
-          `INSERT INTO student_profiles (student_id, ai_resume_json)
-           VALUES (?, ?)
-           ON DUPLICATE KEY UPDATE ai_resume_json = VALUES(ai_resume_json)`,
-          [req.user.id, resumeJson]
-        )
+
+        await prisma.studentProfile.upsert({
+          where: { student_id: req.user.id },
+          create: {
+            student_id: req.user.id,
+            ai_resume_json: resumeJson,
+          },
+          update: {
+            ai_resume_json: resumeJson,
+          },
+        })
       }
 
       res.json(parsed)
@@ -119,4 +124,3 @@ router.post(
 )
 
 export default router
-

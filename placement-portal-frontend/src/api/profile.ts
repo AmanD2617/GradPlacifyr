@@ -5,6 +5,7 @@ export interface StudentProject {
   description: string
   techStack: string
   githubLink?: string
+  link?: string
 }
 
 export interface StudentProfile {

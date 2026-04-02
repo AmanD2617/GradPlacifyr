@@ -25,7 +25,7 @@ It supports four operational personas:
 
 ```text
 Placement-Portal/
-  placement-portal-backend/   # Node.js + Express + MySQL API
+  placement-portal-backend/   # Node.js + Express + PostgreSQL API
   placement-portal-frontend/  # React + TypeScript + Vite UI
 ```
 
@@ -55,7 +55,7 @@ Placement-Portal/
 ### 3.1 Backend
 - Node.js (ES modules)
 - Express
-- MySQL (`mysql2/promise`)
+- PostgreSQL (`pg`)
 - JWT (`jsonwebtoken`)
 - Password hashing (`bcryptjs`)
 - Email (`nodemailer`)
@@ -76,7 +76,7 @@ Placement-Portal/
 ## 4. Role Model and Authorization
 
 ### 4.1 Roles in DB
-`users.role` supports:
+`users.role` supports (PostgreSQL custom enum `user_role`):
 - `student`
 - `admin`
 - `recruiter`
@@ -111,7 +111,7 @@ The backend follows a route -> controller -> service pattern for auth and route-
 1. Request enters `server.js`
 2. Route-level middleware validates auth/role
 3. Controller/handler executes business logic
-4. DB operations via pooled MySQL connection
+4. DB operations via pooled PostgreSQL connection
 5. Errors are normalized by `errorHandler`
 
 ## 5.3 Error Response Shape
@@ -139,6 +139,7 @@ Required/optional variables used in code:
 - `PORT` (default: `3000`)
 - `JWT_SECRET` (fallback exists but should be strong and explicit)
 - `DB_HOST`
+- `DB_PORT` (default: `5432`)
 - `DB_USER`
 - `DB_PASSWORD`
 - `DB_NAME`
@@ -278,7 +279,7 @@ Authentication header for protected routes:
   - apply to job
 
 - `GET /applications/my` (student)
-  - student’s own applications
+  - studentï¿½s own applications
 
 - `GET /applications?jobId=...` (admin/company/tpo)
   - list applicant records; company-scoped
@@ -501,7 +502,7 @@ Frontend TypeScript check:
 
 ## 18. Quick Start (One-Page Summary)
 
-1. Start MySQL and create DB with `scripts/init-db.sql`
+1. Start PostgreSQL and create DB with `scripts/init-db.sql`
 2. Configure backend `.env`
 3. Run backend: `npm run dev`
 4. Run frontend: `npm run dev`

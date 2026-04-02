@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { AppError } from '../utils/appError.js'
 
 export function notFoundHandler(req, res, next) {
@@ -11,7 +12,7 @@ export function errorHandler(err, req, res, next) {
   let code = err.code || 'INTERNAL_ERROR'
   let message = err.message || 'Something went wrong'
 
-  // Validation errors (e.g. from Mongoose or manual validation)
+  // Validation errors (e.g. from manual validation)
   if (err.name === 'ValidationError') {
     statusCode = 400
     code = 'VALIDATION_ERROR'
@@ -28,24 +29,74 @@ export function errorHandler(err, req, res, next) {
     message = 'Authentication token has expired'
   }
 
-  // MongoDB errors
-  if (err.name === 'MongoError' || err.name === 'MongoServerError') {
-    if (err.code === 11000) {
-      statusCode = 409
-      code = 'DUPLICATE_KEY'
-      message = 'Duplicate key error'
-    } else if (statusCode === 500) {
-      statusCode = 500
-      code = 'DB_ERROR'
-      message = 'Database error'
+  // ── Prisma errors ─────────────────────────────────────────────────────────
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (err.code) {
+      case 'P2002': // Unique constraint violation
+        statusCode = 409
+        code = 'DUPLICATE_KEY'
+        message = `Duplicate entry on ${(err.meta?.target || []).join(', ') || 'unknown field'}`
+        break
+      case 'P2003': // Foreign key constraint failed
+        statusCode = 400
+        code = 'FOREIGN_KEY_VIOLATION'
+        message = 'Referenced record does not exist'
+        break
+      case 'P2025': // Record not found (update/delete)
+        statusCode = 404
+        code = 'NOT_FOUND'
+        message = err.meta?.cause || 'Record not found'
+        break
+      case 'P2011': // Null constraint violation
+        statusCode = 400
+        code = 'VALIDATION_ERROR'
+        message = `Missing required field: ${err.meta?.constraint || 'unknown'}`
+        break
+      case 'P2012': // Missing required value
+        statusCode = 400
+        code = 'VALIDATION_ERROR'
+        message = `Missing required value`
+        break
+      default:
+        statusCode = 500
+        code = 'DATABASE_ERROR'
+        message = 'A database error occurred'
     }
   }
 
-  // MySQL duplicate entry (current project)
-  if (err.code === 'ER_DUP_ENTRY' && statusCode === 500) {
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    statusCode = 400
+    code = 'VALIDATION_ERROR'
+    message = 'Invalid data provided to database query'
+  }
+
+  // ── Legacy PostgreSQL errors (kept for safety during transition) ───────────
+  // unique_violation (duplicate key)
+  if (err.code === '23505' && statusCode === 500) {
     statusCode = 409
     code = 'DUPLICATE_KEY'
     message = 'Duplicate entry'
+  }
+
+  // foreign_key_violation
+  if (err.code === '23503' && statusCode === 500) {
+    statusCode = 400
+    code = 'FOREIGN_KEY_VIOLATION'
+    message = 'Referenced record does not exist'
+  }
+
+  // not_null_violation
+  if (err.code === '23502' && statusCode === 500) {
+    statusCode = 400
+    code = 'VALIDATION_ERROR'
+    message = `Missing required field: ${err.column || 'unknown'}`
+  }
+
+  // check_violation
+  if (err.code === '23514' && statusCode === 500) {
+    statusCode = 400
+    code = 'VALIDATION_ERROR'
+    message = 'Value violates a check constraint'
   }
 
   const response = {
@@ -60,7 +111,7 @@ export function errorHandler(err, req, res, next) {
     response.error.details = err.details
   }
 
-  // Standard shape for validation details (e.g. Mongoose)
+  // Standard shape for validation details
   if (err.errors && typeof err.errors === 'object' && !Array.isArray(err.errors)) {
     response.error.validation = Object.keys(err.errors).map((key) => ({
       field: key,
@@ -79,4 +130,3 @@ export function errorHandler(err, req, res, next) {
 
   res.status(statusCode).json(response)
 }
-

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import pool from '../db/connection.js'
+import prisma from '../db/prisma.js'
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js'
 import { AppError } from '../utils/appError.js'
 import { buildCompanyJobScope } from '../utils/jobOwnerColumn.js'
@@ -30,34 +30,41 @@ router.post(
         throw new AppError('jobId is required', 400, 'VALIDATION_ERROR')
       }
 
-      const [jobs] = await pool.execute(
-        'SELECT id, status FROM jobs WHERE id = ?',
-        [jobId]
-      )
+      const job = await prisma.job.findUnique({
+        where: { id: Number(jobId) },
+        select: { id: true, status: true },
+      })
 
-      if (!jobs.length) {
+      if (!job) {
         throw new AppError('Job not found', 404, 'JOB_NOT_FOUND')
       }
 
-      if (jobs[0].status !== 'open') {
+      if (job.status !== 'open') {
         throw new AppError('Job is closed', 400, 'JOB_CLOSED')
       }
 
-      const [existing] = await pool.execute(
-        'SELECT id FROM applications WHERE job_id = ? AND student_id = ?',
-        [jobId, studentId]
-      )
-      if (existing.length) {
+      const existing = await prisma.application.findUnique({
+        where: {
+          job_id_student_id: { job_id: Number(jobId), student_id: studentId },
+        },
+        select: { id: true },
+      })
+
+      if (existing) {
         throw new AppError('Already applied to this job', 409, 'ALREADY_APPLIED')
       }
 
-      const [result] = await pool.execute(
-        'INSERT INTO applications (job_id, student_id, status) VALUES (?, ?, ?)',
-        [jobId, studentId, 'applied']
-      )
+      const application = await prisma.application.create({
+        data: {
+          job_id: Number(jobId),
+          student_id: studentId,
+          status: 'applied',
+        },
+        select: { id: true },
+      })
 
       res.status(201).json({
-        id: result.insertId,
+        id: application.id,
         jobId: Number(jobId),
         studentId,
         status: 'applied',
@@ -75,21 +82,31 @@ router.get(
   authorizeRoles('student'),
   async (req, res, next) => {
     try {
-      const [rows] = await pool.execute(
-        `SELECT
-           a.id,
-           a.job_id AS jobId,
-           a.status,
-           a.applied_at AS appliedAt,
-           j.title AS jobTitle,
-           j.company
-         FROM applications a
-         JOIN jobs j ON j.id = a.job_id
-         WHERE a.student_id = ?
-         ORDER BY a.applied_at DESC`,
-        [req.user.id]
-      )
-      res.json(rows)
+      const rows = await prisma.application.findMany({
+        where: { student_id: req.user.id },
+        select: {
+          id: true,
+          job_id: true,
+          status: true,
+          applied_at: true,
+          job: {
+            select: { title: true, company: true },
+          },
+        },
+        orderBy: { applied_at: 'desc' },
+      })
+
+      // Shape response to match original API contract
+      const result = rows.map((r) => ({
+        id: r.id,
+        jobId: r.job_id,
+        status: r.status,
+        appliedAt: r.applied_at,
+        jobTitle: r.job.title,
+        company: r.job.company,
+      }))
+
+      res.json(result)
     } catch (err) {
       next(err)
     }
@@ -104,41 +121,51 @@ router.get(
   async (req, res, next) => {
     try {
       const { jobId } = req.query
-      const params = []
-      const whereParts = []
+      const where = {}
 
+      // Build the job-level filter for company scoping
       if (req.user.role === 'company') {
         const scope = await buildCompanyJobScope('j', req.user.id)
-        whereParts.push(scope.clause)
-        params.push(...scope.params)
+        where.job = scope.prismaWhere
       }
 
       if (jobId) {
-        whereParts.push('a.job_id = ?')
-        params.push(jobId)
+        // Nest jobId inside the job relation filter
+        where.job = { ...where.job, id: Number(jobId) }
       }
 
-      const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : ''
+      const rows = await prisma.application.findMany({
+        where,
+        select: {
+          id: true,
+          job_id: true,
+          student_id: true,
+          status: true,
+          applied_at: true,
+          job: {
+            select: { title: true, company: true },
+          },
+          student: {
+            select: { name: true, email: true },
+          },
+        },
+        orderBy: { applied_at: 'desc' },
+      })
 
-      const [rows] = await pool.execute(
-        `SELECT
-           a.id,
-           a.job_id AS jobId,
-           a.student_id AS studentId,
-           a.status,
-           a.applied_at AS appliedAt,
-           j.title AS jobTitle,
-           j.company,
-           u.name AS studentName,
-           u.email AS studentEmail
-         FROM applications a
-         JOIN jobs j ON j.id = a.job_id
-         JOIN users u ON u.id = a.student_id
-         ${whereClause}
-         ORDER BY a.applied_at DESC`,
-        params
-      )
-      res.json(rows)
+      // Shape response to match original API contract
+      const result = rows.map((r) => ({
+        id: r.id,
+        jobId: r.job_id,
+        studentId: r.student_id,
+        status: r.status,
+        appliedAt: r.applied_at,
+        jobTitle: r.job.title,
+        company: r.job.company,
+        studentName: r.student.name,
+        studentEmail: r.student.email,
+      }))
+
+      res.json(result)
     } catch (err) {
       next(err)
     }
@@ -157,25 +184,37 @@ router.patch(
         throw new AppError('Invalid status value', 400, 'VALIDATION_ERROR')
       }
 
-      let result
+      const appId = Number(req.params.id)
+
+      // For company users, verify the application belongs to one of their jobs
       if (req.user.role === 'company') {
         const scope = await buildCompanyJobScope('j', req.user.id)
-        ;[result] = await pool.execute(
-          `UPDATE applications a
-           JOIN jobs j ON j.id = a.job_id
-           SET a.status = ?
-           WHERE a.id = ? AND ${scope.clause}`,
-          [status, req.params.id, ...scope.params]
-        )
+        const app = await prisma.application.findFirst({
+          where: {
+            id: appId,
+            job: scope.prismaWhere,
+          },
+          select: { id: true },
+        })
+
+        if (!app) {
+          throw new AppError('Application not found', 404, 'APPLICATION_NOT_FOUND')
+        }
       } else {
-        ;[result] = await pool.execute(
-          'UPDATE applications SET status = ? WHERE id = ?',
-          [status, req.params.id]
-        )
+        const app = await prisma.application.findUnique({
+          where: { id: appId },
+          select: { id: true },
+        })
+        if (!app) {
+          throw new AppError('Application not found', 404, 'APPLICATION_NOT_FOUND')
+        }
       }
-      if (result.affectedRows === 0) {
-        throw new AppError('Application not found', 404, 'APPLICATION_NOT_FOUND')
-      }
+
+      await prisma.application.update({
+        where: { id: appId },
+        data: { status },
+      })
+
       res.json({ ok: true })
     } catch (err) {
       next(err)

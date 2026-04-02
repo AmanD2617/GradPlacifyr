@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../../context/AuthContext'
 import {
   Briefcase,
   ClipboardList,
@@ -16,16 +17,14 @@ import { getMyApplications, type StudentApplication } from '../../api/applicatio
 import { getMyProfile, type StudentProfile } from '../../api/profile'
 import {
   ActivityTimeline,
-  ChartCard,
   DashboardLayout,
+  EventCalendar,
   MetricCard,
   QuickActionCard,
   SuggestionPanel,
   type SuggestionItem,
   type TimelineItem,
 } from '../../components/dashboard'
-
-const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 function scoreProfile(profile: StudentProfile) {
   const checks = [
@@ -53,6 +52,7 @@ function readinessLabel(score: number) {
 }
 
 const StudentDashboardHome = () => {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [openJobsCount, setOpenJobsCount] = useState(0)
@@ -107,38 +107,6 @@ const StudentDashboardHome = () => {
     return items.length ? items : ['Maintain regular updates before drives']
   }, [profile])
 
-  const statusChartData = useMemo(() => {
-    const base = new Map<string, number>()
-    for (const app of applications) {
-      base.set(app.status, (base.get(app.status) || 0) + 1)
-    }
-    return Array.from(base.entries()).map(([name, value]) => ({ name, value }))
-  }, [applications])
-
-  const trendLineData = useMemo(() => {
-    const monthMap = new Map<string, number>()
-    for (const app of applications) {
-      const dt = new Date(app.appliedAt)
-      const key = `${MONTH_SHORT[dt.getMonth()]} ${String(dt.getFullYear()).slice(2)}`
-      monthMap.set(key, (monthMap.get(key) || 0) + 1)
-    }
-    return Array.from(monthMap.entries()).map(([month, applicationsCount]) => ({
-      month,
-      applications: applicationsCount,
-    }))
-  }, [applications])
-
-  const readinessBarData = useMemo(
-    () => [
-      {
-        stage: 'Readiness',
-        profile: profileCompletion,
-        score: readinessScore,
-      },
-    ],
-    [profileCompletion, readinessScore]
-  )
-
   const activityItems = useMemo<TimelineItem[]>(
     () =>
       applications.slice(0, 5).map((item) => ({
@@ -174,8 +142,10 @@ const StudentDashboardHome = () => {
 
   return (
     <DashboardLayout
+      greeting={`Hi, ${user?.name ?? 'Student'}`}
       title="Student Dashboard"
       subtitle="Track opportunities, monitor your funnel, and improve placement readiness with guided insights."
+      compactLayout
       error={error}
       kpis={
         <>
@@ -186,65 +156,30 @@ const StudentDashboardHome = () => {
           <MetricCard icon={Target} label="Placement Readiness Score" value={`${readinessScore}%`} trend={5} loading={loading} />
         </>
       }
+      calendar={<EventCalendar />}
       analytics={
-        <div className="chart-grid">
-          <ChartCard
-            title="Applications by Status"
-            subtitle="Distribution across selection pipeline"
-            config={{
-              kind: 'donut',
-              data: statusChartData.length ? statusChartData : [{ name: 'No Data', value: 1 }],
-            }}
-            loading={loading}
-          />
-          <ChartCard
-            title="Application Trend"
-            subtitle="Monthly submission trend"
-            config={{
-              kind: 'line',
-              data: trendLineData,
-              xKey: 'month',
-              series: [{ key: 'applications', label: 'Applications', color: '#1f4b9c' }],
-            }}
-            loading={loading}
-          />
-          <ChartCard
-            title="Readiness Snapshot"
-            subtitle="Profile completion vs readiness score"
-            config={{
-              kind: 'bar',
-              data: readinessBarData,
-              xKey: 'stage',
-              series: [
-                { key: 'profile', label: 'Profile %', color: '#1f4b9c' },
-                { key: 'score', label: 'Readiness %', color: '#daa824' },
-              ],
-            }}
-            loading={loading}
-          />
-          <article className="profile-strength">
-            <div className="profile-strength-top">
-              <h3>Profile Strength</h3>
-              <span>{readinessLabel(readinessScore)}</span>
-            </div>
-            <div className="profile-bar">
-              <i style={{ width: `${readinessScore}%` }} />
-            </div>
-            <div className="suggestion-panel" style={{ marginTop: '0.55rem' }}>
-              <ul className="suggestion-list">
-                {profileSuggestions.map((item) => (
-                  <li key={item}>
-                    <Sparkles size={15} />
-                    <div>
-                      <h4>{item}</h4>
-                      <p>Keep improving profile quality for stronger recruiter matches.</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </article>
-        </div>
+        <article className="profile-strength profile-strength-full">
+          <div className="profile-strength-top">
+            <h3>Profile Strength</h3>
+            <span>{readinessLabel(readinessScore)}</span>
+          </div>
+          <div className="profile-bar">
+            <i style={{ width: `${readinessScore}%` }} />
+          </div>
+          <div className="suggestion-panel" style={{ marginTop: '0.55rem' }}>
+            <ul className="suggestion-list">
+              {profileSuggestions.map((item) => (
+                <li key={item}>
+                  <Sparkles size={15} />
+                  <div>
+                    <h4>{item}</h4>
+                    <p>Keep improving profile quality for stronger recruiter matches.</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </article>
       }
       activity={
         <ActivityTimeline
@@ -261,7 +196,7 @@ const StudentDashboardHome = () => {
             icon={Search}
           />
           <QuickActionCard
-            to="/student/edit-profile"
+            to="/student/profile"
             title="Update Profile"
             description="Keep academics and skills current"
             icon={FilePenLine}

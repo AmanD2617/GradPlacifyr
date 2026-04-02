@@ -1,11 +1,7 @@
-﻿import LandingHeader from '../components/landing/LandingHeader'
+import LandingHeader from '../components/landing/LandingHeader'
 import HeroSection from '../components/landing/HeroSection'
 import StatsSection from '../components/landing/StatsSection'
-import FeaturesSection from '../components/landing/FeaturesSection'
-import ProcessSection from '../components/landing/ProcessSection'
-import PlatformPreviewSection from '../components/landing/PlatformPreviewSection'
 import TestimonialsSection from '../components/landing/TestimonialsSection'
-import CTASection from '../components/landing/CTASection'
 import LandingFooter from '../components/landing/LandingFooter'
 
 const LandingPage = () => {
@@ -15,11 +11,7 @@ const LandingPage = () => {
       <main>
         <HeroSection />
         <StatsSection />
-        <FeaturesSection />
-        <ProcessSection />
-        <PlatformPreviewSection />
         <TestimonialsSection />
-        <CTASection />
       </main>
       <LandingFooter />
     </div>

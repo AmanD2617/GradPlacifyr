@@ -22,7 +22,7 @@ The traditional college placement process is often fragmented, relying on spread
 ### Current Implementation
 * **Frontend:** React.js, TypeScript (`.tsx`), Vite, Tailwind CSS (via PostCSS)
 * **Backend:** Node.js, Express.js
-* **Database:** PostgreSQL (Relational data: Users, Jobs, Applications)
+* **Database:** PostgreSQL (`pg` driver) (Relational data: Users, Jobs, Applications)
 * **Authentication:** JWT (JSON Web Tokens) with Role-Based Access Control (RBAC)
 
 ### Planned / Upcoming Integrations
@@ -193,7 +193,7 @@ classDiagram
 ### Prerequisites
 
 * Node.js (v18+ recommended)
-* PostgreSQL installed and running locally.
+* PostgreSQL (v14+ recommended) installed and running locally.
 
 ### Backend Setup
 
@@ -216,7 +216,10 @@ npm install
 
 
 4. Initialize the Database:
-* Run the SQL scripts provided in `/scripts/init-db.sql` in your Postgres GUI (pgAdmin/DBeaver) or CLI.
+* Run the SQL scripts provided in `/scripts/init-db.sql` in your Postgres GUI (pgAdmin/DBeaver) or via `psql`:
+```bash
+psql -U postgres -f scripts/init-db.sql
+```
 
 
 5. Start the server:

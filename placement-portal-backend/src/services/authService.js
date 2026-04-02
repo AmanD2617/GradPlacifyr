@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import nodemailer from 'nodemailer'
-import pool from '../db/connection.js'
+import prisma from '../db/prisma.js'
 import { AppError } from '../utils/appError.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
@@ -43,6 +43,7 @@ function buildUserPayload(user) {
     email: user.email,
     role: user.role,
     name: user.name || user.email.split('@')[0],
+    profileImage: user.profile_image || null,
   }
 }
 
@@ -52,16 +53,23 @@ export async function registerUser({ email, password, role, name }) {
   }
 
   const hash = await bcrypt.hash(password, 10)
-  const [result] = await pool.execute(
-    'INSERT INTO users (email, password_hash, role, name) VALUES (?, ?, ?, ?)',
-    [email, hash, role, name || email.split('@')[0]]
-  )
+
+  const created = await prisma.user.create({
+    data: {
+      email,
+      password_hash: hash,
+      role,
+      name: name || email.split('@')[0],
+    },
+    select: { id: true },
+  })
 
   const user = {
-    id: result.insertId,
+    id: created.id,
     email,
     role,
     name: name || email.split('@')[0],
+    profile_image: null,
   }
 
   return {
@@ -70,24 +78,44 @@ export async function registerUser({ email, password, role, name }) {
   }
 }
 
-export async function loginUser({ email, password }) {
+export async function loginUser({ email, password, role }) {
   if (!email || !password) {
     throw new AppError('Email and password required', 400, 'VALIDATION_ERROR')
   }
 
-  const [rows] = await pool.execute(
-    'SELECT id, email, password_hash, role, name FROM users WHERE email = ?',
-    [email]
-  )
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true, password_hash: true, role: true, name: true, profile_image: true },
+  })
 
-  if (!rows.length) {
+  if (!user) {
     throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS')
   }
 
-  const user = rows[0]
   const match = await bcrypt.compare(password, user.password_hash)
   if (!match) {
     throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS')
+  }
+
+  // Role validation — if frontend sent a role, it must match the DB role
+  if (role) {
+    // Normalize: frontend sends "recruiter" but DB may store "recruiter";
+    // frontend may send "admin" for both admin and hod roles
+    const normalizedSelected = role.toLowerCase()
+    const dbRole = user.role.toLowerCase()
+
+    const roleMatches =
+      normalizedSelected === dbRole ||
+      (normalizedSelected === 'admin' && dbRole === 'hod') ||
+      (normalizedSelected === 'hod' && dbRole === 'admin')
+
+    if (!roleMatches) {
+      throw new AppError(
+        'You are not registered as this role. Please select the correct role.',
+        403,
+        'ROLE_MISMATCH'
+      )
+    }
   }
 
   return {
@@ -97,11 +125,16 @@ export async function loginUser({ email, password }) {
 }
 
 export async function getUserById(id) {
-  const [rows] = await pool.execute('SELECT id, email, role, name FROM users WHERE id = ?', [id])
-  if (!rows.length) {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, email: true, role: true, name: true, profile_image: true },
+  })
+
+  if (!user) {
     throw new AppError('User not found', 404, 'USER_NOT_FOUND')
   }
-  return buildUserPayload(rows[0])
+
+  return buildUserPayload(user)
 }
 
 function createRawResetToken() {
@@ -130,20 +163,26 @@ export async function createPasswordResetRequest(email) {
     throw new AppError('Email is required', 400, 'VALIDATION_ERROR')
   }
 
-  const [rows] = await pool.execute('SELECT id, email FROM users WHERE email = ?', [email])
-  if (!rows.length) {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true },
+  })
+
+  if (!user) {
     throw new AppError('No account found for this email', 404, 'EMAIL_NOT_FOUND')
   }
 
-  const user = rows[0]
   const rawToken = createRawResetToken()
   const hashedToken = hashResetToken(rawToken)
   const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS)
 
-  await pool.execute(
-    'UPDATE users SET reset_password_token = ?, reset_password_expire = ? WHERE id = ?',
-    [hashedToken, expiresAt, user.id]
-  )
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      reset_password_token: hashedToken,
+      reset_password_expire: expiresAt,
+    },
+  })
 
   const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '')
   const resetLink = `${baseUrl}/reset-password/${rawToken}`
@@ -151,10 +190,13 @@ export async function createPasswordResetRequest(email) {
   try {
     await sendResetEmail(user.email, resetLink)
   } catch (err) {
-    await pool.execute(
-      'UPDATE users SET reset_password_token = NULL, reset_password_expire = NULL WHERE id = ?',
-      [user.id]
-    )
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        reset_password_token: null,
+        reset_password_expire: null,
+      },
+    })
 
     if (err instanceof AppError) {
       throw err
@@ -176,33 +218,39 @@ export async function resetPasswordWithToken(rawToken, newPassword) {
   }
 
   const hashedToken = hashResetToken(rawToken)
-  const [rows] = await pool.execute(
-    'SELECT id, reset_password_expire FROM users WHERE reset_password_token = ?',
-    [hashedToken]
-  )
 
-  if (!rows.length) {
+  const user = await prisma.user.findFirst({
+    where: { reset_password_token: hashedToken },
+    select: { id: true, reset_password_expire: true },
+  })
+
+  if (!user) {
     throw new AppError('Invalid password reset token', 400, 'INVALID_RESET_TOKEN')
   }
 
-  const user = rows[0]
   const expiresAt = user.reset_password_expire ? new Date(user.reset_password_expire) : null
 
   if (!expiresAt || expiresAt.getTime() < Date.now()) {
-    await pool.execute(
-      'UPDATE users SET reset_password_token = NULL, reset_password_expire = NULL WHERE id = ?',
-      [user.id]
-    )
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        reset_password_token: null,
+        reset_password_expire: null,
+      },
+    })
     throw new AppError('Password reset token has expired', 400, 'RESET_TOKEN_EXPIRED')
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 10)
-  await pool.execute(
-    `UPDATE users
-     SET password_hash = ?, reset_password_token = NULL, reset_password_expire = NULL
-     WHERE id = ?`,
-    [passwordHash, user.id]
-  )
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password_hash: passwordHash,
+      reset_password_token: null,
+      reset_password_expire: null,
+    },
+  })
 
   return { message: 'Password reset successful' }
 }

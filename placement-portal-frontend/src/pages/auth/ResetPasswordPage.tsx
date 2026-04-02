@@ -31,7 +31,7 @@ const ResetPasswordPage = () => {
       setLoading(true)
       const result = await resetPasswordApi(token, password)
       setSuccess(result.message || 'Password reset successful. You can now sign in.')
-      setTimeout(() => navigate('/login'), 1500)
+      setTimeout(() => navigate('/login', { replace: true }), 1500)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Invalid or expired reset token'
       setError(message)

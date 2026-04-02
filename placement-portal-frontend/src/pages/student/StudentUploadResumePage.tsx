@@ -1,12 +1,24 @@
-import { useState, type MouseEvent, type ChangeEvent } from 'react'
+import { useEffect, useState, type MouseEvent, type ChangeEvent } from 'react'
 import { generateResume, type GeneratedResume } from '../../api/ai'
-import { parseResume, type ParsedResumeProfile } from '../../api/resume'
+import {
+  parseResume,
+  uploadResume,
+  getMyResume,
+  deleteMyResume,
+  type ParsedResumeProfile,
+  type ResumeInfo,
+} from '../../api/resume'
+import { FileText, Upload, Trash2, ExternalLink, CheckCircle2 } from 'lucide-react'
 import '../shared/WorkPages.css'
+
+const API_ORIGIN = 'http://localhost:3000'
 
 const StudentUploadResumePage = () => {
   const [fileName, setFileName] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [linkedInUrl, setLinkedInUrl] = useState('')
   const [profileText, setProfileText] = useState('')
   const [aiResume, setAiResume] = useState<GeneratedResume | null>(null)
@@ -14,21 +26,78 @@ const StudentUploadResumePage = () => {
   const [generating, setGenerating] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [parsedProfile, setParsedProfile] = useState<ParsedResumeProfile | null>(null)
+  const [currentResume, setCurrentResume] = useState<ResumeInfo | null>(null)
+  const [loadingResume, setLoadingResume] = useState(true)
+  const [deleting, setDeleting] = useState(false)
+
+  // Fetch existing resume on mount
+  useEffect(() => {
+    getMyResume()
+      .then((info) => setCurrentResume(info))
+      .catch(() => setCurrentResume(null))
+      .finally(() => setLoadingResume(false))
+  }, [])
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const nextFile = e.target.files?.[0] ?? null
     setFile(nextFile)
     setFileName(nextFile ? nextFile.name : null)
     setMessage(null)
+    setError(null)
   }
 
-  const handleUploadClick = () => {
-    setMessage(fileName ? 'Resume attached (demo state).' : 'Please select a PDF file.')
+  const handleUploadClick = async () => {
+    setError(null)
+    setMessage(null)
+
+    if (!file) {
+      setError('Please select a PDF file first.')
+      return
+    }
+
+    try {
+      setUploading(true)
+      const result = await uploadResume(file)
+      setCurrentResume({
+        resumeUrl: result.resumeUrl,
+        originalName: result.originalName,
+      })
+      setMessage('Resume uploaded successfully!')
+      setFile(null)
+      setFileName(null)
+      // Reset file input
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      if (input) input.value = ''
+    } catch (err: unknown) {
+      const raw = err instanceof Error ? err.message : 'Upload failed'
+      setError(raw === 'Failed to fetch'
+        ? 'Cannot reach server. Ensure the backend is running.'
+        : raw)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleDeleteResume = async () => {
+    setError(null)
+    setMessage(null)
+    try {
+      setDeleting(true)
+      await deleteMyResume()
+      setCurrentResume(null)
+      setMessage('Resume removed.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to remove resume'
+      setError(msg)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const handleParseResume = async () => {
     setAiError(null)
     setMessage(null)
+    setError(null)
     setParsedProfile(null)
     if (!file) {
       setAiError('Select a PDF resume first.')
@@ -56,6 +125,7 @@ const StudentUploadResumePage = () => {
     e.preventDefault()
     setAiError(null)
     setMessage(null)
+    setError(null)
     setAiResume(null)
     if (!linkedInUrl.trim() && !profileText.trim()) {
       setAiError('Provide a LinkedIn profile URL or a short profile summary.')
@@ -155,9 +225,46 @@ const StudentUploadResumePage = () => {
         <p>Upload your PDF resume or let AI draft a placement-ready version from your profile.</p>
       </article>
 
+      {/* ── Current Resume Status ── */}
+      {!loadingResume && currentResume?.resumeUrl && (
+        <article className="work-card">
+          <div className="resume-status-card">
+            <div className="resume-status-info">
+              <CheckCircle2 size={20} className="resume-status-icon" />
+              <div>
+                <h3 className="resume-status-title">Resume Uploaded</h3>
+                <p className="resume-status-filename">
+                  <FileText size={14} />
+                  {currentResume.originalName || 'resume.pdf'}
+                </p>
+              </div>
+            </div>
+            <div className="resume-status-actions">
+              <a
+                href={`${API_ORIGIN}${currentResume.resumeUrl}`}
+                target="_blank"
+                rel="noreferrer"
+                className="work-btn secondary resume-view-btn"
+              >
+                <ExternalLink size={14} /> View / Download
+              </a>
+              <button
+                type="button"
+                className="resume-remove-btn"
+                onClick={handleDeleteResume}
+                disabled={deleting}
+              >
+                <Trash2 size={14} /> {deleting ? 'Removing...' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </article>
+      )}
+
+      {/* ── Upload Section ── */}
       <article className="work-card">
         <div className="work-form">
-          <h2>Upload Existing Resume</h2>
+          <h2>{currentResume?.resumeUrl ? 'Replace Resume' : 'Upload Existing Resume'}</h2>
           <label>
             Select Resume (PDF)
             <input
@@ -167,25 +274,31 @@ const StudentUploadResumePage = () => {
             />
           </label>
           {fileName && <p className="work-muted">Selected file: {fileName}</p>}
+
+          {error && <p className="work-error">{error}</p>}
+          {message && <p className="work-success">{message}</p>}
+
           <button
             className="work-btn"
             type="button"
             onClick={handleUploadClick}
+            disabled={uploading || !file}
           >
-            Upload
+            <Upload size={15} />
+            {uploading ? 'Uploading...' : 'Upload'}
           </button>
           <button
             className="work-btn secondary"
             type="button"
-            disabled={parsing}
+            disabled={parsing || !file}
             onClick={handleParseResume}
           >
-            {parsing ? 'Parsing resume…' : 'Let AI parse resume'}
+            {parsing ? 'Parsing resume...' : 'Let AI parse resume'}
           </button>
-          {message && <p className="work-success">{message}</p>}
         </div>
       </article>
 
+      {/* ── AI Resume Generator ── */}
       <article className="work-card">
         <form className="work-form">
           <h2>AI Resume Generator</h2>
@@ -216,11 +329,12 @@ const StudentUploadResumePage = () => {
             disabled={generating}
             onClick={handleGenerate}
           >
-            {generating ? 'Generating resume…' : 'Generate AI Resume'}
+            {generating ? 'Generating resume...' : 'Generate AI Resume'}
           </button>
         </form>
       </article>
 
+      {/* ── Parsed Resume Suggestions ── */}
       {parsedProfile && (
         <article className="work-card">
           <h2>Parsed Resume Suggestions</h2>
@@ -231,11 +345,11 @@ const StudentUploadResumePage = () => {
           <div className="work-grid-2">
             <div>
               <h3>Programming Languages</h3>
-              <p>{parsedProfile.programmingLanguages.join(', ') || '—'}</p>
+              <p>{parsedProfile.programmingLanguages.join(', ') || '\u2014'}</p>
               <h3>Frameworks</h3>
-              <p>{parsedProfile.frameworks.join(', ') || '—'}</p>
+              <p>{parsedProfile.frameworks.join(', ') || '\u2014'}</p>
               <h3>Tools</h3>
-              <p>{parsedProfile.tools.join(', ') || '—'}</p>
+              <p>{parsedProfile.tools.join(', ') || '\u2014'}</p>
             </div>
             <div>
               <h3>Certifications</h3>
@@ -257,7 +371,7 @@ const StudentUploadResumePage = () => {
             </div>
           </div>
           <h3>Internship Experience</h3>
-          <p>{parsedProfile.internshipExperience || '—'}</p>
+          <p>{parsedProfile.internshipExperience || '\u2014'}</p>
           <h3>Achievements</h3>
           <ul>
             {parsedProfile.achievements.length === 0 ? (
@@ -269,6 +383,7 @@ const StudentUploadResumePage = () => {
         </article>
       )}
 
+      {/* ── AI Resume Preview ── */}
       {aiResume && (
         <article className="work-card">
           <div className="work-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
@@ -355,7 +470,7 @@ const StudentUploadResumePage = () => {
                 <ul>
                   {aiResume.education.map((edu) => (
                     <li key={`${edu.degree}-${edu.institution}-${edu.year}`}>
-                      <strong>{edu.degree}</strong> – {edu.institution} ({edu.year})
+                      <strong>{edu.degree}</strong> {'\u2013'} {edu.institution} ({edu.year})
                       {edu.grade && (
                         <>
                           <br />

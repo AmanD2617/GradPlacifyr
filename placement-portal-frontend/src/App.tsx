@@ -9,6 +9,7 @@ import RoleSelectionPage from './pages/auth/RoleSelectionPage'
 import ProtectedRoute from './components/routing/ProtectedRoute'
 import PortalLayout from './components/layout/PortalLayout'
 import PublicInfoPage from './pages/public/PublicInfoPage'
+import RecruitmentProcessPage from './pages/public/RecruitmentProcessPage'
 import StudentDashboardHome from './pages/student/StudentDashboardHome'
 import StudentProfile from './pages/student/StudentProfile'
 import StudentChangePassword from './pages/student/StudentChangePassword'
@@ -16,9 +17,8 @@ import AvailableJobsPage from './pages/student/AvailableJobsPage'
 import JobDetailsPage from './pages/student/JobDetailsPage'
 import AppliedJobsPage from './pages/student/AppliedJobsPage'
 import CompanyDashboardHome from './pages/company/CompanyDashboardHome'
-import TpoDashboardHome from './pages/tpo/TpoDashboardHome'
 import AdminDashboardHome from './pages/admin/AdminDashboardHome'
-import StudentEditProfilePage from './pages/student/StudentEditProfilePage'
+// StudentEditProfilePage removed — merged into StudentProfile
 import StudentUploadResumePage from './pages/student/StudentUploadResumePage'
 import StudentInterviewSchedulePage from './pages/student/StudentInterviewSchedulePage'
 import CompanyPostJobPage from './pages/company/CompanyPostJobPage'
@@ -54,17 +54,7 @@ function App() {
               ]}
             />
           } />
-          <Route path="/recruitment-process" element={
-            <PublicInfoPage
-              title="Recruitment Process"
-              intro="The process follows registration, eligibility screening, tests, interviews, and final selection for JIMS Rohini Sector-5."
-              highlights={[
-                'Job publication and eligibility checks',
-                'Aptitude/technical rounds and shortlisting',
-                'Final interview and offer confirmation',
-              ]}
-            />
-          } />
+          <Route path="/recruitment-process" element={<RecruitmentProcessPage />} />
           <Route path="/placement-statistics" element={
             <PublicInfoPage
               title="Placement Statistics"
@@ -99,7 +89,8 @@ function App() {
             <Route element={<PortalLayout />}>
               <Route path="/student/dashboard" element={<StudentDashboardHome />} />
               <Route path="/student/profile" element={<StudentProfile />} />
-              <Route path="/student/edit-profile" element={<StudentEditProfilePage />} />
+              {/* edit-profile merged into /student/profile — redirect for bookmarks */}
+              <Route path="/student/edit-profile" element={<Navigate to="/student/profile" replace />} />
               <Route path="/student/upload-resume" element={<StudentUploadResumePage />} />
               <Route path="/student/jobs" element={<AvailableJobsPage />} />
               <Route path="/student/jobs/:id" element={<JobDetailsPage />} />
@@ -116,16 +107,21 @@ function App() {
               <Route path="/company/upload-results" element={<CompanyUploadResultsPage />} />
               <Route path="/company/change-password" element={<RecruiterChangePassword />} />
 
-              <Route path="/tpo/dashboard" element={<TpoDashboardHome />} />
-              <Route path="/tpo/approve-jobs" element={<TpoApproveJobsPage />} />
-              <Route path="/tpo/monitor-applications" element={<TpoMonitorApplicationsPage />} />
-              <Route path="/tpo/reports" element={<TpoReportsPage />} />
+              {/* Redirects from old TPO paths to new Admin paths */}
+              <Route path="/tpo/dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="/tpo/approve-jobs" element={<Navigate to="/admin/approve-jobs" replace />} />
+              <Route path="/tpo/monitor-applications" element={<Navigate to="/admin/monitor-applications" replace />} />
+              <Route path="/tpo/reports" element={<Navigate to="/admin/reports" replace />} />
 
+              {/* Admin routes (includes merged TPO features) */}
               <Route path="/admin/dashboard" element={<AdminDashboardHome />} />
               <Route path="/admin/profile" element={<AdminProfile />} />
               <Route path="/admin/change-password" element={<AdminChangePassword />} />
               <Route path="/admin/manage-students" element={<AdminManageStudentsPage />} />
               <Route path="/admin/manage-companies" element={<AdminManageCompaniesPage />} />
+              <Route path="/admin/approve-jobs" element={<TpoApproveJobsPage />} />
+              <Route path="/admin/monitor-applications" element={<TpoMonitorApplicationsPage />} />
+              <Route path="/admin/reports" element={<TpoReportsPage />} />
             </Route>
           </Route>
 

@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../../context/AuthContext'
 import {
   GraduationCap,
   Building2,
   BriefcaseBusiness,
   ChartNoAxesColumn,
   Users,
+  Briefcase,
+  CalendarCheck,
+  Activity,
   ClipboardCheck,
   FileBarChart,
   Handshake,
+  Eye,
 } from 'lucide-react'
 import { getJobs, type Job } from '../../api/jobs'
 import { getApplications, type PortalApplication } from '../../api/applications'
@@ -16,6 +21,7 @@ import {
   ActivityTimeline,
   ChartCard,
   DashboardLayout,
+  EventCalendar,
   MetricCard,
   QuickActionCard,
   SuggestionPanel,
@@ -26,6 +32,7 @@ import {
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const AdminDashboardHome = () => {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [jobs, setJobs] = useState<Job[]>([])
@@ -42,29 +49,55 @@ const AdminDashboardHome = () => {
         setCompanies(companyRows)
       })
       .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : 'Failed to load admin dashboard data'
+        const message = err instanceof Error ? err.message : 'Failed to load dashboard data'
         setError(message)
       })
       .finally(() => setLoading(false))
   }, [])
 
+  // ── Derived metrics (merged from Admin + TPO) ──────────────────────────
+
+  const activeCompanies = useMemo(() => new Set(jobs.map((j) => j.company)).size, [jobs])
+  const activeJobs = useMemo(() => jobs.filter((j) => j.status === 'open').length, [jobs])
+
+  const selectedCount = useMemo(
+    () => applications.filter((a) => a.status === 'selected').length,
+    [applications]
+  )
+
   const placementPercentage = useMemo(() => {
     if (!applications.length) return 0
-    const selected = applications.filter((item) => item.status === 'selected').length
-    return Math.round((selected / applications.length) * 100)
-  }, [applications])
+    return Math.round((selectedCount / applications.length) * 100)
+  }, [applications.length, selectedCount])
 
+  const interviewsScheduled = useMemo(
+    () => applications.filter((a) => ['test_scheduled', 'interview_scheduled'].includes(a.status)).length,
+    [applications]
+  )
+
+  // ── Chart data ─────────────────────────────────────────────────────────
+
+  // Placement pipeline (selected / in-progress / rejected)
   const placementStatsData = useMemo(() => {
-    const selected = applications.filter((item) => item.status === 'selected').length
-    const rejected = applications.filter((item) => item.status === 'rejected').length
-    const inProgress = Math.max(applications.length - selected - rejected, 0)
+    const rejected = applications.filter((a) => a.status === 'rejected').length
+    const inProgress = Math.max(applications.length - selectedCount - rejected, 0)
     return [
-      { name: 'Selected', value: selected },
+      { name: 'Selected', value: selectedCount },
       { name: 'In Progress', value: inProgress },
       { name: 'Rejected', value: rejected },
     ]
+  }, [applications, selectedCount])
+
+  // Granular status breakdown (from TPO — more detailed funnel)
+  const statusBreakdownData = useMemo(() => {
+    const base = new Map<string, number>()
+    for (const app of applications) {
+      base.set(app.status, (base.get(app.status) || 0) + 1)
+    }
+    return Array.from(base.entries()).map(([name, value]) => ({ name, value }))
   }, [applications])
 
+  // Monthly application trend
   const trendData = useMemo(() => {
     const monthMap = new Map<string, number>()
     for (const app of applications) {
@@ -75,15 +108,27 @@ const AdminDashboardHome = () => {
     return Array.from(monthMap.entries()).map(([month, applicationsCount]) => ({ month, applications: applicationsCount }))
   }, [applications])
 
-  const branchLikeDistribution = useMemo(() => {
-    const buckets = [
-      { branch: 'CSE/IT', students: Math.round(students.length * 0.36), placed: Math.round(students.length * 0.36 * 0.52) },
-      { branch: 'ECE', students: Math.round(students.length * 0.24), placed: Math.round(students.length * 0.24 * 0.48) },
-      { branch: 'BBA', students: Math.round(students.length * 0.22), placed: Math.round(students.length * 0.22 * 0.45) },
-      { branch: 'BCA', students: Math.round(students.length * 0.18), placed: Math.round(students.length * 0.18 * 0.42) },
-    ]
-    return buckets
-  }, [students.length])
+  // Branch-wise distribution
+  const branchDistribution = useMemo(() => [
+    { branch: 'CSE/IT', students: Math.round(students.length * 0.36), placed: Math.round(students.length * 0.36 * 0.52) },
+    { branch: 'ECE', students: Math.round(students.length * 0.24), placed: Math.round(students.length * 0.24 * 0.48) },
+    { branch: 'BBA', students: Math.round(students.length * 0.22), placed: Math.round(students.length * 0.22 * 0.45) },
+    { branch: 'BCA', students: Math.round(students.length * 0.18), placed: Math.round(students.length * 0.18 * 0.42) },
+  ], [students.length])
+
+  // Company-wise applications (from TPO)
+  const companyDistribution = useMemo(() => {
+    const byCompany = new Map<string, number>()
+    for (const app of applications) {
+      byCompany.set(app.company, (byCompany.get(app.company) || 0) + 1)
+    }
+    return Array.from(byCompany.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([company, count]) => ({ company, count }))
+  }, [applications])
+
+  // ── Activity timeline ──────────────────────────────────────────────────
 
   const activityItems = useMemo<TimelineItem[]>(
     () =>
@@ -96,6 +141,8 @@ const AdminDashboardHome = () => {
       })),
     [applications]
   )
+
+  // ── Smart suggestions (merged) ─────────────────────────────────────────
 
   const suggestionItems = useMemo<SuggestionItem[]>(
     () => [
@@ -110,40 +157,63 @@ const AdminDashboardHome = () => {
         detail: `${companies.length} companies are active. Invite niche employers for better role diversity.`,
       },
       {
+        id: 'drives',
+        title: 'Prioritize high-volume drives',
+        detail: `There are ${activeJobs} active jobs. Review SLA adherence for each company.`,
+      },
+      {
+        id: 'interview',
+        title: 'Balance interview load',
+        detail: `${interviewsScheduled} interview/test rounds are in progress. Coordinate scheduling early.`,
+      },
+      {
         id: 'student-enablement',
         title: 'Launch readiness workshops',
         detail: `Support ${students.length} students with focused interview and aptitude prep sessions.`,
       },
     ],
-    [placementPercentage, companies.length, students.length]
+    [placementPercentage, companies.length, activeJobs, interviewsScheduled, students.length]
   )
+
+  // ── Render ─────────────────────────────────────────────────────────────
 
   return (
     <DashboardLayout
+      greeting={`Hi, ${user?.name ?? 'Admin'}`}
       title="Admin Dashboard"
-      subtitle="Get a unified view of platform performance, user growth, and placement outcomes."
+      subtitle="Unified view of platform performance, drive operations, user growth, and placement outcomes."
+      compactLayout
       error={error}
       kpis={
         <>
           <MetricCard icon={GraduationCap} label="Total Students" value={students.length} trend={5} loading={loading} />
-          <MetricCard icon={Building2} label="Total Companies" value={companies.length} trend={4} loading={loading} />
-          <MetricCard icon={BriefcaseBusiness} label="Total Jobs" value={jobs.length} trend={6} loading={loading} />
+          <MetricCard icon={Building2} label="Active Companies" value={activeCompanies} trend={4} loading={loading} />
+          <MetricCard icon={Briefcase} label="Active Jobs" value={activeJobs} trend={6} loading={loading} />
           <MetricCard
             icon={ChartNoAxesColumn}
-            label="Placement Percentage"
+            label="Placement %"
             value={`${placementPercentage}%`}
             trend={3}
             loading={loading}
           />
+          <MetricCard icon={Users} label="Applications" value={applications.length} trend={8} loading={loading} />
           <MetricCard
-            icon={Users}
-            label="Applications Received"
-            value={applications.length}
-            trend={8}
+            icon={CalendarCheck}
+            label="Interviews Scheduled"
+            value={interviewsScheduled}
+            trend={5}
+            loading={loading}
+          />
+          <MetricCard
+            icon={Activity}
+            label="Selection Ratio"
+            value={applications.length ? `${Math.round((selectedCount / applications.length) * 100)}%` : '0%'}
+            trend={3}
             loading={loading}
           />
         </>
       }
+      calendar={<EventCalendar canManage />}
       analytics={
         <div className="chart-grid">
           <ChartCard
@@ -156,8 +226,17 @@ const AdminDashboardHome = () => {
             loading={loading}
           />
           <ChartCard
+            title="Applications by Status"
+            subtitle="Round-wise funnel view"
+            config={{
+              kind: 'donut',
+              data: statusBreakdownData.length ? statusBreakdownData : [{ name: 'No Data', value: 1 }],
+            }}
+            loading={loading}
+          />
+          <ChartCard
             title="Applications Trend"
-            subtitle="Platform-level demand over time"
+            subtitle="Month-over-month pipeline flow"
             config={{
               kind: 'line',
               data: trendData,
@@ -167,16 +246,27 @@ const AdminDashboardHome = () => {
             loading={loading}
           />
           <ChartCard
-            title="Branch-wise Placement Distribution"
-            subtitle="Current split across academic cohorts"
+            title="Branch-wise Placement"
+            subtitle="Split across academic cohorts"
             config={{
               kind: 'bar',
-              data: branchLikeDistribution,
+              data: branchDistribution,
               xKey: 'branch',
               series: [
                 { key: 'students', label: 'Students', color: '#20468b' },
                 { key: 'placed', label: 'Placed', color: '#daa824' },
               ],
+            }}
+            loading={loading}
+          />
+          <ChartCard
+            title="Company-wise Distribution"
+            subtitle="Applications by active companies"
+            config={{
+              kind: 'bar',
+              data: companyDistribution,
+              xKey: 'company',
+              series: [{ key: 'count', label: 'Applications', color: '#daa824' }],
             }}
             loading={loading}
           />
@@ -198,16 +288,22 @@ const AdminDashboardHome = () => {
             icon={Handshake}
           />
           <QuickActionCard
-            to="/tpo/reports"
+            to="/admin/approve-jobs"
+            title="Approve JNF / TNF"
+            description="Validate and control job postings"
+            icon={ClipboardCheck}
+          />
+          <QuickActionCard
+            to="/admin/monitor-applications"
+            title="Monitor Applications"
+            description="Watch movement across rounds"
+            icon={Eye}
+          />
+          <QuickActionCard
+            to="/admin/reports"
             title="Placement Reports"
             description="Open analytics and exports"
             icon={FileBarChart}
-          />
-          <QuickActionCard
-            to="/tpo/approve-jobs"
-            title="Approve Jobs"
-            description="Support TPO in drive approvals"
-            icon={ClipboardCheck}
           />
         </div>
       }

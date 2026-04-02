@@ -7,6 +7,7 @@ export interface User {
   email: string
   name: string
   role: Role
+  profileImage?: string | null
 }
 
 export interface LoginResponse {
@@ -14,10 +15,10 @@ export interface LoginResponse {
   user: User
 }
 
-export async function login(email: string, password: string): Promise<LoginResponse> {
+export async function login(email: string, password: string, role: Role): Promise<LoginResponse> {
   return apiFetch<LoginResponse>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, role }),
   })
 }
 

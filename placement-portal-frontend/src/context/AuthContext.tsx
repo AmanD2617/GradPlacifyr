@@ -9,12 +9,14 @@ interface User {
   email: string
   name: string
   role: Role
+  profileImage?: string | null
 }
 
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string, role: Role) => Promise<void>
   logout: () => void
+  updateProfileImage: (imageUrl: string | null) => void
   isAuthenticated: boolean
 }
 
@@ -33,6 +35,7 @@ function toUser(u: ApiUser): User {
     email: u.email,
     name: u.name || u.email.split('@')[0],
     role: u.role,
+    profileImage: u.profileImage || null,
   }
 }
 
@@ -45,13 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
 
   const login = useCallback(
-    async (email: string, password: string, _selectedRole: Role): Promise<void> => {
-      const res = await apiLogin(email, password)
+    async (email: string, password: string, selectedRole: Role): Promise<void> => {
+      const res = await apiLogin(email, password, selectedRole)
       const u = toUser(res.user)
       setUser(u)
       localStorage.setItem('placement_user', JSON.stringify(u))
       localStorage.setItem('placement_token', res.token)
-      navigate(routes[u.role])
+      navigate(routes[u.role], { replace: true })
     },
     [navigate]
   )
@@ -60,8 +63,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     localStorage.removeItem('placement_user')
     localStorage.removeItem('placement_token')
-    navigate('/')
+    navigate('/', { replace: true })
   }, [navigate])
+
+  const updateProfileImage = useCallback((imageUrl: string | null) => {
+    setUser((prev) => {
+      if (!prev) return prev
+      const updated = { ...prev, profileImage: imageUrl }
+      localStorage.setItem('placement_user', JSON.stringify(updated))
+      return updated
+    })
+  }, [])
 
   return (
     <AuthContext.Provider
@@ -69,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         login,
         logout,
+        updateProfileImage,
         isAuthenticated: !!user,
       }}
     >

@@ -3,12 +3,54 @@
   gap: 1rem;
 }
 
+/* Calendar slot — no card wrapper, the component supplies its own gradient bg */
+.dashboard-calendar-slot {
+  border-radius: 1.1rem;
+  overflow: hidden;
+}
+
+/* ── Height-matched row: Calendar left · Quick Actions right ── */
+.dashboard-split-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+/* Calendar wrapper fills its grid cell */
+.dashboard-split-row > .dashboard-calendar-slot {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Quick Actions card in the row also fills height */
+.dashboard-split-row > .dashboard-section {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Quick actions single-column in the matched row for a tighter fit */
+.dashboard-split-row .quick-action-grid {
+  grid-template-columns: 1fr;
+  flex: 1;
+}
+
+.dashboard-greeting {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--jims-ink, #1e293b);
+}
+
 .dashboard-hero {
   background: linear-gradient(135deg, #1f4b9c 0%, #214b8a 60%, #daa824 130%);
   color: #fff;
   border-radius: 1rem;
-  padding: 1rem 1.1rem;
+  padding: 0.85rem 1.5rem;
   box-shadow: 0 12px 30px rgba(31, 75, 156, 0.25);
+  justify-self: start;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .dashboard-hero h1 {
@@ -318,6 +360,10 @@
   margin-bottom: 0.65rem;
 }
 
+.profile-strength-full {
+  grid-column: 1 / -1;
+}
+
 .profile-strength-top {
   display: flex;
   justify-content: space-between;
@@ -395,6 +441,18 @@
 
   .chart-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Split layout stays 2-col until 1180 */
+}
+
+@media (max-width: 960px) {
+  .dashboard-split-row {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-split-row .quick-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import jimsLogo from '../../assets/jims-logo.png'
 
 const navItems = [
@@ -7,7 +6,6 @@ const navItems = [
   { label: 'Process', to: '/recruitment-process' },
   { label: 'Statistics', to: '/placement-statistics' },
   { label: 'Contact', to: '/contact' },
-  { label: 'Register', to: '/register' },
   { label: 'Role Selection', to: '/role-selection' },
 ]
 
@@ -29,22 +27,11 @@ const LandingHeader = () => {
               {item.label}
             </Link>
           ))}
-          <motion.div whileHover={{ y: -1 }}>
-            <Link
-              to="/login"
-              className="ml-1 rounded-full bg-jimsBlue px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-jimsBlueDark"
-            >
-              Sign in
-            </Link>
-          </motion.div>
         </nav>
 
         <div className="flex items-center gap-2 lg:hidden">
           <Link to="/role-selection" className="rounded-full border border-blue-200 px-3 py-1.5 text-sm font-medium text-jimsBlue">
             Roles
-          </Link>
-          <Link to="/login" className="rounded-full bg-jimsBlue px-3 py-1.5 text-sm font-semibold text-white">
-            Sign in
           </Link>
         </div>
       </div>

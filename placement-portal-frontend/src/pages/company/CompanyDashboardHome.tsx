@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../../context/AuthContext'
 import {
   BriefcaseBusiness,
   Users,
@@ -15,6 +16,7 @@ import {
   ActivityTimeline,
   ChartCard,
   DashboardLayout,
+  EventCalendar,
   MetricCard,
   QuickActionCard,
   SuggestionPanel,
@@ -25,6 +27,7 @@ import {
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const CompanyDashboardHome = () => {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [jobs, setJobs] = useState<Job[]>([])
@@ -119,8 +122,10 @@ const CompanyDashboardHome = () => {
 
   return (
     <DashboardLayout
+      greeting={`Hi, ${user?.name ?? 'Recruiter'}`}
       title="Company Dashboard"
       subtitle="Monitor job performance, track applicants, and accelerate hiring outcomes with live analytics."
+      compactLayout
       error={error}
       kpis={
         <>
@@ -137,6 +142,7 @@ const CompanyDashboardHome = () => {
           />
         </>
       }
+      calendar={<EventCalendar canManage />}
       analytics={
         <div className="chart-grid">
           <ChartCard

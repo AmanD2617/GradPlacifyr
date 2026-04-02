@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import pool from '../db/connection.js'
+import prisma from '../db/prisma.js'
 import {
   authenticateToken,
   authorizeRoles,
@@ -14,26 +14,34 @@ import {
 
 const router = Router()
 
+// Shared select object for list views (avoids fetching description/requirements)
+const JOB_LIST_SELECT = {
+  id: true,
+  title: true,
+  company: true,
+  ctc: true,
+  location: true,
+  status: true,
+  created_at: true,
+}
+
 // GET /api/jobs - list all jobs
 router.get('/', authenticateToken, authorizeRoles('student', 'company', 'tpo', 'admin'), async (req, res, next) => {
   try {
-    let rows
+    let where = {}
+
     if (req.user?.role === 'company') {
       const scope = await buildCompanyJobScope('j', req.user.id)
-      ;[rows] = await pool.execute(
-        `SELECT j.id, j.title, j.company, j.ctc, j.location, j.status, j.created_at
-         FROM jobs j
-         WHERE ${scope.clause}
-         ORDER BY j.created_at DESC`,
-        scope.params
-      )
-    } else {
-      ;[rows] = await pool.execute(
-        `SELECT j.id, j.title, j.company, j.ctc, j.location, j.status, j.created_at
-         FROM jobs j ORDER BY j.created_at DESC`
-      )
+      where = scope.prismaWhere
     }
-    res.json(rows)
+
+    const jobs = await prisma.job.findMany({
+      where,
+      select: JOB_LIST_SELECT,
+      orderBy: { created_at: 'desc' },
+    })
+
+    res.json(jobs)
   } catch (err) {
     next(err)
   }
@@ -42,24 +50,21 @@ router.get('/', authenticateToken, authorizeRoles('student', 'company', 'tpo', '
 // GET /api/jobs/:id - get single job
 router.get('/:id', optionalAuthenticateToken, async (req, res, next) => {
   try {
-    let rows
+    const id = Number(req.params.id)
+    let where = { id }
+
     if (req.user?.role === 'company') {
       const scope = await buildCompanyJobScope('jobs', req.user.id)
-      ;[rows] = await pool.execute(
-        `SELECT * FROM jobs WHERE id = ? AND ${scope.clause}`,
-        [req.params.id, ...scope.params]
-      )
-    } else {
-      ;[rows] = await pool.execute(
-        'SELECT * FROM jobs WHERE id = ?',
-        [req.params.id]
-      )
+      where = { ...where, ...scope.prismaWhere }
     }
 
-    if (!rows.length) {
+    const job = await prisma.job.findFirst({ where })
+
+    if (!job) {
       throw new AppError('Job not found', 404, 'JOB_NOT_FOUND')
     }
-    res.json(rows[0])
+
+    res.json(job)
   } catch (err) {
     next(err)
   }
@@ -73,25 +78,26 @@ router.post('/', authenticateToken, authorizeRoles('admin', 'company'), async (r
       throw new AppError('Title and company required', 400, 'VALIDATION_ERROR')
     }
 
-    const ownerColumn = await getJobOwnerColumn()
-    const companyName = req.user.role === 'company' ? await getCompanyNameByUserId(req.user.id) : company
-    const safeCompany = req.user.role === 'company' ? companyName : company
+    const safeCompany =
+      req.user.role === 'company'
+        ? await getCompanyNameByUserId(req.user.id)
+        : company
 
-    let sql
-    let params
+    const job = await prisma.job.create({
+      data: {
+        title,
+        company: safeCompany,
+        ctc: ctc || null,
+        location: location || null,
+        description: description || null,
+        requirements: requirements || null,
+        status: 'open',
+        created_by: req.user.id,
+      },
+      select: { id: true },
+    })
 
-    if (ownerColumn) {
-      sql = `INSERT INTO jobs (title, company, ctc, location, description, requirements, status, ${ownerColumn})
-             VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`
-      params = [title, safeCompany, ctc || null, location || null, description || null, requirements || null, req.user.id]
-    } else {
-      sql = `INSERT INTO jobs (title, company, ctc, location, description, requirements, status)
-             VALUES (?, ?, ?, ?, ?, ?, 'open')`
-      params = [title, safeCompany, ctc || null, location || null, description || null, requirements || null]
-    }
-
-    const [result] = await pool.execute(sql, params)
-    res.status(201).json({ id: result.insertId, title, company: safeCompany, status: 'open' })
+    res.status(201).json({ id: job.id, title, company: safeCompany, status: 'open' })
   } catch (err) {
     next(err)
   }
@@ -100,24 +106,35 @@ router.post('/', authenticateToken, authorizeRoles('admin', 'company'), async (r
 // PUT /api/jobs/:id - update job
 router.put('/:id', authenticateToken, authorizeRoles('admin', 'company'), async (req, res, next) => {
   try {
-    const { title, company, ctc, location, description, requirements, status } = req.body
-    const params = [title, company, ctc, location, description, requirements, status || 'open', req.params.id]
-    let sql =
-      `UPDATE jobs SET title=?, company=?, ctc=?, location=?, description=?, requirements=?, status=?
-       WHERE id=?`
+    let { title, company, ctc, location, description, requirements, status } = req.body
+    const id = Number(req.params.id)
+    let where = { id }
 
     if (req.user.role === 'company') {
       const scope = await buildCompanyJobScope('jobs', req.user.id)
-      sql += ` AND ${scope.clause}`
-      params.push(...scope.params)
-      const companyName = await getCompanyNameByUserId(req.user.id)
-      params[1] = companyName
+      where = { ...where, ...scope.prismaWhere }
+      company = await getCompanyNameByUserId(req.user.id)
     }
 
-    const [result] = await pool.execute(sql, params)
-    if (result.affectedRows === 0) {
+    // Prisma doesn't support updateMany with unique return, so check first
+    const existing = await prisma.job.findFirst({ where, select: { id: true } })
+    if (!existing) {
       throw new AppError('Job not found', 404, 'JOB_NOT_FOUND')
     }
+
+    await prisma.job.update({
+      where: { id: existing.id },
+      data: {
+        title,
+        company,
+        ctc,
+        location,
+        description,
+        requirements,
+        status: status || 'open',
+      },
+    })
+
     res.json({ ok: true })
   } catch (err) {
     next(err)
@@ -127,22 +144,21 @@ router.put('/:id', authenticateToken, authorizeRoles('admin', 'company'), async 
 // DELETE /api/jobs/:id
 router.delete('/:id', authenticateToken, authorizeRoles('admin', 'company'), async (req, res, next) => {
   try {
-    let result
+    const id = Number(req.params.id)
+    let where = { id }
+
     if (req.user.role === 'company') {
       const scope = await buildCompanyJobScope('jobs', req.user.id)
-      ;[result] = await pool.execute(
-        `DELETE FROM jobs WHERE id = ? AND ${scope.clause}`,
-        [req.params.id, ...scope.params]
-      )
-    } else {
-      ;[result] = await pool.execute(
-        'DELETE FROM jobs WHERE id = ?',
-        [req.params.id]
-      )
+      where = { ...where, ...scope.prismaWhere }
     }
-    if (result.affectedRows === 0) {
+
+    const existing = await prisma.job.findFirst({ where, select: { id: true } })
+    if (!existing) {
       throw new AppError('Job not found', 404, 'JOB_NOT_FOUND')
     }
+
+    await prisma.job.delete({ where: { id: existing.id } })
+
     res.json({ ok: true })
   } catch (err) {
     next(err)

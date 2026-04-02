@@ -1,7 +1,6 @@
 import { Router } from 'express'
-import pool from '../db/connection.js'
+import prisma from '../db/prisma.js'
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js'
-import { AppError } from '../utils/appError.js'
 
 const router = Router()
 
@@ -13,27 +12,41 @@ router.get(
   async (req, res, next) => {
     try {
       const { role, q } = req.query
-      const where = []
-      const params = []
+      const where = {}
 
       if (role) {
-        where.push('role = ?')
-        params.push(role)
-      }
-      if (q) {
-        where.push('(name LIKE ? OR email LIKE ?)')
-        params.push(`%${q}%`, `%${q}%`)
+        where.role = role
       }
 
-      const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
-      const [rows] = await pool.execute(
-        `SELECT id, name, email, role, created_at AS createdAt
-         FROM users
-         ${whereClause}
-         ORDER BY created_at DESC`,
-        params
-      )
-      res.json(rows)
+      if (q) {
+        where.OR = [
+          { name: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } },
+        ]
+      }
+
+      const users = await prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          created_at: true,
+        },
+        orderBy: { created_at: 'desc' },
+      })
+
+      // Shape response to match original API contract (camelCase alias)
+      const result = users.map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        createdAt: u.created_at,
+      }))
+
+      res.json(result)
     } catch (err) {
       next(err)
     }

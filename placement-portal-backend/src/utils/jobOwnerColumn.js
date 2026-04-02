@@ -1,36 +1,33 @@
-import pool from '../db/connection.js'
+import prisma from '../db/prisma.js'
 import { AppError } from './appError.js'
 
-const OWNER_COLUMN_PRIORITY = ['company_id', 'recruiter_id', 'user_id', 'created_by']
-let cachedOwnerColumn = undefined
+// With Prisma the schema is known at build time — the jobs table has a
+// `created_by` column.  We keep the helper interface identical so callers
+// (jobs, applications routes) don't need structural changes.
 
+/**
+ * Returns the owner-column name on the jobs table.
+ * With the Prisma schema we know it is always 'created_by'.
+ */
 export async function getJobOwnerColumn() {
-  if (cachedOwnerColumn !== undefined) return cachedOwnerColumn
-
-  const placeholders = OWNER_COLUMN_PRIORITY.map(() => '?').join(', ')
-  const [rows] = await pool.execute(
-    `SELECT COLUMN_NAME
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = 'jobs'
-       AND COLUMN_NAME IN (${placeholders})`,
-    OWNER_COLUMN_PRIORITY
-  )
-
-  const existing = new Set(rows.map((row) => row.COLUMN_NAME))
-  cachedOwnerColumn = OWNER_COLUMN_PRIORITY.find((column) => existing.has(column)) || null
-  return cachedOwnerColumn
+  return 'created_by'
 }
 
+/**
+ * Look up a user's display name (used as company name fallback).
+ */
 export async function getCompanyNameByUserId(userId) {
-  const [rows] = await pool.execute('SELECT name, email FROM users WHERE id = ?', [userId])
-  if (!rows.length) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true },
+  })
+
+  if (!user) {
     throw new AppError('User not found', 404, 'USER_NOT_FOUND')
   }
 
-  const row = rows[0]
-  const fallback = row.email ? row.email.split('@')[0] : ''
-  const companyName = (row.name || fallback || '').trim()
+  const fallback = user.email ? user.email.split('@')[0] : ''
+  const companyName = (user.name || fallback || '').trim()
 
   if (!companyName) {
     throw new AppError('Company profile name is missing', 400, 'COMPANY_NAME_REQUIRED')
@@ -39,21 +36,37 @@ export async function getCompanyNameByUserId(userId) {
   return companyName
 }
 
-export async function buildCompanyJobScope(alias, userId) {
+/**
+ * Build a Prisma-compatible WHERE object scoping jobs to a company user.
+ * Returns { where: object, mode: string } instead of raw SQL fragments.
+ *
+ * NOTE: For backward-compat with routes that may still build raw SQL,
+ * the legacy `clause / params / nextIndex` interface is also provided.
+ */
+export async function buildCompanyJobScope(alias, userId, startIndex = 1) {
   const ownerColumn = await getJobOwnerColumn()
 
   if (ownerColumn) {
     return {
-      clause: `${alias}.${ownerColumn} = ?`,
+      // Prisma-friendly filter
+      prismaWhere: { created_by: userId },
+      // Legacy raw-SQL compat (used in routes during transition)
+      clause: `${alias}.${ownerColumn} = $${startIndex}`,
       params: [userId],
       mode: 'owner-column',
+      nextIndex: startIndex + 1,
     }
   }
 
+  // Fallback: match by company name
   const companyName = await getCompanyNameByUserId(userId)
   return {
-    clause: `LOWER(TRIM(${alias}.company)) = LOWER(TRIM(?))`,
+    prismaWhere: {
+      company: { equals: companyName, mode: 'insensitive' },
+    },
+    clause: `LOWER(TRIM(${alias}.company)) = LOWER(TRIM($${startIndex}))`,
     params: [companyName],
     mode: 'company-name',
+    nextIndex: startIndex + 1,
   }
 }

@@ -1,14 +1,33 @@
 import { Router } from 'express'
-import pool from '../db/connection.js'
+import prisma from '../db/prisma.js'
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js'
 import { AppError } from '../utils/appError.js'
 
 const router = Router()
 
+const EMPTY_PROFILE = {
+  tenthPercentage: null,
+  twelfthPercentage: null,
+  backlogs: null,
+  graduationYear: null,
+  programmingLanguages: '',
+  frameworks: '',
+  tools: '',
+  certifications: '',
+  projects: [],
+  internshipExperience: '',
+  achievements: '',
+  githubUrl: '',
+  linkedinUrl: '',
+  portfolioUrl: '',
+  resumeUrl: null,
+  resumeOriginalName: null,
+}
+
 function normaliseProfileRow(row) {
   return {
-    tenthPercentage: row.tenth_percentage,
-    twelfthPercentage: row.twelfth_percentage,
+    tenthPercentage: row.tenth_percentage ? Number(row.tenth_percentage) : null,
+    twelfthPercentage: row.twelfth_percentage ? Number(row.twelfth_percentage) : null,
     backlogs: row.backlogs,
     graduationYear: row.graduation_year,
     programmingLanguages: row.programming_languages || '',
@@ -21,6 +40,8 @@ function normaliseProfileRow(row) {
     githubUrl: row.github_url || '',
     linkedinUrl: row.linkedin_url || '',
     portfolioUrl: row.portfolio_url || '',
+    resumeUrl: row.resume_url || null,
+    resumeOriginalName: row.resume_original_name || null,
   }
 }
 
@@ -30,31 +51,15 @@ router.get(
   authorizeRoles('student'),
   async (req, res, next) => {
     try {
-      const [rows] = await pool.execute(
-        'SELECT * FROM student_profiles WHERE student_id = ?',
-        [req.user.id]
-      )
+      const profile = await prisma.studentProfile.findUnique({
+        where: { student_id: req.user.id },
+      })
 
-      if (!rows.length) {
-        return res.json({
-          tenthPercentage: null,
-          twelfthPercentage: null,
-          backlogs: null,
-          graduationYear: null,
-          programmingLanguages: '',
-          frameworks: '',
-          tools: '',
-          certifications: '',
-          projects: [],
-          internshipExperience: '',
-          achievements: '',
-          githubUrl: '',
-          linkedinUrl: '',
-          portfolioUrl: '',
-        })
+      if (!profile) {
+        return res.json(EMPTY_PROFILE)
       }
 
-      res.json(normaliseProfileRow(rows[0]))
+      res.json(normaliseProfileRow(profile))
     } catch (err) {
       next(err)
     }
@@ -93,65 +98,33 @@ router.put(
 
       const projectsJson = JSON.stringify(projects || [])
 
-      await pool.execute(
-        `INSERT INTO student_profiles (
-           student_id,
-           tenth_percentage,
-           twelfth_percentage,
-           backlogs,
-           graduation_year,
-           programming_languages,
-           frameworks,
-           tools,
-           certifications,
-           projects_json,
-           internship_experience,
-           achievements,
-           github_url,
-           linkedin_url,
-           portfolio_url
-         )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           tenth_percentage = VALUES(tenth_percentage),
-           twelfth_percentage = VALUES(twelfth_percentage),
-           backlogs = VALUES(backlogs),
-           graduation_year = VALUES(graduation_year),
-           programming_languages = VALUES(programming_languages),
-           frameworks = VALUES(frameworks),
-           tools = VALUES(tools),
-           certifications = VALUES(certifications),
-           projects_json = VALUES(projects_json),
-           internship_experience = VALUES(internship_experience),
-           achievements = VALUES(achievements),
-           github_url = VALUES(github_url),
-           linkedin_url = VALUES(linkedin_url),
-           portfolio_url = VALUES(portfolio_url)`,
-        [
-          req.user.id,
-          tenthPercentage ?? null,
-          twelfthPercentage ?? null,
-          backlogs ?? null,
-          graduationYear ?? null,
-          programmingLanguages ?? null,
-          frameworks ?? null,
-          tools ?? null,
-          certifications ?? null,
-          projectsJson,
-          internshipExperience ?? null,
-          achievements ?? null,
-          githubUrl ?? null,
-          linkedinUrl ?? null,
-          portfolioUrl ?? null,
-        ]
-      )
+      const data = {
+        tenth_percentage: tenthPercentage ?? null,
+        twelfth_percentage: twelfthPercentage ?? null,
+        backlogs: backlogs ?? null,
+        graduation_year: graduationYear ?? null,
+        programming_languages: programmingLanguages ?? null,
+        frameworks: frameworks ?? null,
+        tools: tools ?? null,
+        certifications: certifications ?? null,
+        projects_json: projectsJson,
+        internship_experience: internshipExperience ?? null,
+        achievements: achievements ?? null,
+        github_url: githubUrl ?? null,
+        linkedin_url: linkedinUrl ?? null,
+        portfolio_url: portfolioUrl ?? null,
+      }
 
-      const [rows] = await pool.execute(
-        'SELECT * FROM student_profiles WHERE student_id = ?',
-        [req.user.id]
-      )
+      const profile = await prisma.studentProfile.upsert({
+        where: { student_id: req.user.id },
+        create: {
+          student_id: req.user.id,
+          ...data,
+        },
+        update: data,
+      })
 
-      res.json(normaliseProfileRow(rows[0]))
+      res.json(normaliseProfileRow(profile))
     } catch (err) {
       next(err)
     }
@@ -159,4 +132,3 @@ router.put(
 )
 
 export default router
-

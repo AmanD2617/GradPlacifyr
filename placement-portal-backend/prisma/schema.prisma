@@ -1,0 +1,135 @@
+// Prisma Schema for Placement Portal
+// Maps exactly to the existing PostgreSQL database tables.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum user_role {
+  student
+  admin
+  recruiter
+  hod
+}
+
+enum job_status {
+  open
+  closed
+}
+
+enum application_status {
+  applied
+  eligible
+  shortlisted
+  test_scheduled
+  interview_scheduled
+  selected
+  rejected
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id                   Int       @id @default(autoincrement())
+  email                String    @unique @db.VarChar(255)
+  password_hash        String    @db.VarChar(255)
+  role                 user_role @default(student)
+  name                 String?   @db.VarChar(255)
+  profile_image        String?   @db.VarChar(500)
+  reset_password_token String?   @db.VarChar(255)
+  reset_password_expire DateTime? @db.Timestamptz()
+  created_at           DateTime  @default(now()) @db.Timestamptz()
+
+  // Relations
+  jobs         Job[]            @relation("JobCreator")
+  applications Application[]    @relation("StudentApplications")
+  profile      StudentProfile?  @relation("UserProfile")
+  events       Event[]          @relation("EventCreator")
+
+  @@map("users")
+}
+
+model Job {
+  id           Int        @id @default(autoincrement())
+  title        String     @db.VarChar(255)
+  company      String     @db.VarChar(255)
+  created_by   Int?
+  ctc          String?    @db.VarChar(50)
+  location     String?    @db.VarChar(255)
+  description  String?
+  requirements String?
+  status       job_status @default(open)
+  created_at   DateTime   @default(now()) @db.Timestamptz()
+
+  // Relations
+  creator      User?         @relation("JobCreator", fields: [created_by], references: [id])
+  applications Application[] @relation("JobApplications")
+
+  @@map("jobs")
+}
+
+model Application {
+  id         Int                @id @default(autoincrement())
+  job_id     Int
+  student_id Int
+  status     application_status @default(applied)
+  applied_at DateTime           @default(now()) @db.Timestamptz()
+
+  // Relations
+  job     Job  @relation("JobApplications", fields: [job_id], references: [id])
+  student User @relation("StudentApplications", fields: [student_id], references: [id])
+
+  @@unique([job_id, student_id])
+  @@map("applications")
+}
+
+model StudentProfile {
+  student_id            Int      @id
+  tenth_percentage      Decimal? @db.Decimal(5, 2)
+  twelfth_percentage    Decimal? @db.Decimal(5, 2)
+  backlogs              Int?
+  graduation_year       Int?
+  programming_languages String?
+  frameworks            String?
+  tools                 String?
+  certifications        String?
+  projects_json         String?
+  internship_experience String?
+  achievements          String?
+  github_url            String?  @db.VarChar(255)
+  linkedin_url          String?  @db.VarChar(255)
+  portfolio_url         String?  @db.VarChar(255)
+  resume_url            String?  @db.VarChar(500)
+  resume_original_name  String?  @db.VarChar(255)
+  ai_resume_json        String?
+  created_at            DateTime @default(now()) @db.Timestamptz()
+  updated_at            DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  // Relations
+  student User @relation("UserProfile", fields: [student_id], references: [id])
+
+  @@map("student_profiles")
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(255)
+  description String?
+  date        DateTime @db.Date
+  time        String?  @db.VarChar(10)
+  company     String?  @db.VarChar(255)
+  created_by  Int
+  created_at  DateTime @default(now()) @db.Timestamptz()
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  // Relations
+  creator User @relation("EventCreator", fields: [created_by], references: [id])
+
+  @@map("events")
+}

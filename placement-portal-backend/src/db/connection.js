@@ -1,12 +1,12 @@
-import mysql from 'mysql2/promise'
+import pg from 'pg'
 
-const pool = mysql.createPool({
+const pool = new pg.Pool({
   host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
+  port: Number(process.env.DB_PORT || 5432),
+  user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'placement_portal',
-  waitForConnections: true,
-  connectionLimit: 10,
+  max: 10,
 })
 
 export default pool

@@ -1,51 +1,90 @@
+/* ── Shell: full-width, no left sidebar column ── */
 .portal-shell {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: 280px 1fr;
   background:
     radial-gradient(circle at 20% 10%, #eef4ff 0%, transparent 35%),
     radial-gradient(circle at 80% 20%, #eff5ff 0%, transparent 35%),
     linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
 }
 
+/* ── Right-side drawer (hidden by default) ── */
 .portal-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 300px;
+  max-width: 85vw;
+  z-index: 30;
   background: linear-gradient(180deg, var(--jims-maroon) 0%, var(--jims-maroon-dark) 100%);
   color: #f1f5f9;
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #315da8;
+  border-left: 1px solid #315da8;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  overflow-y: auto;
 }
 
+.portal-sidebar.open {
+  transform: translateX(0);
+}
+
+/* ── Drawer header (close button only) ── */
+.portal-drawer-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.portal-close-btn {
+  border: 0;
+  background: transparent;
+  color: #e8effd;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.4rem;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.portal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── Brand ── */
 .portal-brand {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1rem;
 }
 
 .portal-logo-image {
-  width: 92px;
+  width: 60px;
   height: auto;
   object-fit: contain;
   border-radius: 0.35rem;
   background: #ffffff;
-  padding: 0.2rem;
+  padding: 0.15rem;
 }
 
 .portal-brand-title {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
 }
 
 .portal-brand-subtitle {
   margin: 0.2rem 0 0;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   letter-spacing: 0.08em;
   color: #dbe5f7;
 }
 
+/* ── Navigation ── */
 .portal-nav {
   display: grid;
   gap: 0.4rem;
@@ -70,10 +109,12 @@
   font-weight: 700;
 }
 
+/* ── Sidebar footer ── */
 .portal-sidebar-footer {
   margin-top: auto;
   display: grid;
   gap: 0.5rem;
+  padding-top: 1rem;
 }
 
 .portal-secondary-link {
@@ -91,11 +132,13 @@
   font-weight: 600;
 }
 
+/* ── Main content wrapper (full-width) ── */
 .portal-main-wrap {
   display: grid;
   grid-template-rows: auto 1fr;
 }
 
+/* ── Top bar ── */
 .portal-topbar {
   position: sticky;
   top: 0;
@@ -109,6 +152,7 @@
   background: rgba(255, 255, 255, 0.9);
 }
 
+/* ── Burger menu button (always visible) ── */
 .portal-menu-btn {
   border: 0;
   background: var(--jims-maroon);
@@ -116,14 +160,19 @@
   border-radius: 0.6rem;
   padding: 0.55rem 0.7rem;
   cursor: pointer;
-  display: none;
   font-size: 1.1rem;
+  display: inline-block;
 }
 
-.portal-welcome {
-  margin: 0;
-  color: var(--jims-ink);
-  font-weight: 600;
+.portal-menu-btn:hover {
+  opacity: 0.9;
+}
+
+/* ── Topbar logo ── */
+.portal-topbar-logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
 }
 
 .portal-topbar-right {
@@ -132,87 +181,253 @@
   gap: 0.7rem;
 }
 
+/* ═══════════════════════════════════════════════════
+   AVATAR BUTTON WITH COMPLETION RING
+   ═══════════════════════════════════════════════════ */
+
 .portal-profile-wrap {
   position: relative;
 }
 
-.portal-profile-btn {
-  border: 1px solid var(--jims-border);
-  background: #fff;
-  color: var(--jims-maroon-dark);
-  border-radius: 0.5rem;
-  padding: 0.45rem 0.7rem;
+.portal-avatar-btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  padding: 0;
   cursor: pointer;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+.portal-avatar-btn:focus-visible {
+  outline: 2px solid #1f4b9c;
+  outline-offset: 2px;
+}
+
+/* SVG ring sits absolutely on top */
+.avatar-ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Initials circle inside the ring */
+.portal-avatar-initials {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1f4b9c 0%, #3b6fd4 100%);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.03em;
+  user-select: none;
+  position: relative;
+  z-index: 1;
+}
+
+.portal-avatar-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Hover tooltip ── */
+.portal-avatar-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 50%;
+  transform: translateX(50%);
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: #1e293b;
+  color: #fff;
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.45rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  animation: tooltip-fade 0.2s ease;
+  z-index: 50;
+}
+
+.portal-avatar-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  right: 50%;
+  transform: translateX(50%);
+  border: 5px solid transparent;
+  border-bottom-color: #1e293b;
+}
+
+@keyframes tooltip-fade {
+  from { opacity: 0; transform: translateX(50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(50%) translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════
+   PROFILE DROPDOWN
+   ═══════════════════════════════════════════════════ */
 
 .portal-profile-dropdown {
   position: absolute;
   right: 0;
-  top: calc(100% + 0.45rem);
-  min-width: 170px;
-  border: 1px solid var(--jims-border);
-  border-radius: 0.65rem;
+  top: calc(100% + 10px);
+  min-width: 240px;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
   background: #fff;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.14);
-  display: grid;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
   overflow: hidden;
   z-index: 40;
+  animation: dropdown-slide 0.2s ease;
 }
 
-.portal-profile-dropdown a,
-.portal-profile-dropdown button {
-  padding: 0.6rem 0.7rem;
-  font-size: 0.9rem;
-  color: var(--jims-ink-soft);
+@keyframes dropdown-slide {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Dropdown header (user info) ── */
+.portal-dropdown-header {
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.portal-dropdown-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #102441;
+  text-transform: capitalize;
+}
+
+.portal-dropdown-email {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+/* ── Completion bar inside dropdown ── */
+.portal-dropdown-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.portal-dropdown-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.portal-dropdown-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  transition: width 0.4s ease;
+}
+
+.portal-dropdown-bar-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #16a34a;
+  white-space: nowrap;
+}
+
+/* ── Divider ── */
+.portal-dropdown-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0;
+}
+
+/* ── Menu items ── */
+.portal-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  font-size: 0.88rem;
+  color: #374151;
   background: #fff;
   border: 0;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.portal-profile-dropdown a:hover,
-.portal-profile-dropdown button:hover {
-  background: #eef4ff;
-  color: var(--jims-maroon-dark);
+.portal-dropdown-item:hover {
+  background: #f0f5ff;
+  color: #1f4b9c;
 }
 
+.portal-dropdown-item svg {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.portal-dropdown-item:hover svg {
+  opacity: 1;
+}
+
+/* ── Logout item (red on hover) ── */
+.portal-dropdown-logout:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* ── Main content area ── */
 .portal-content {
   padding: 1.25rem;
 }
 
+/* ── Overlay ── */
 .portal-overlay {
   display: none;
 }
 
-@media (max-width: 920px) {
-  .portal-shell {
-    grid-template-columns: 1fr;
-  }
+.portal-overlay.show {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  z-index: 20;
+}
 
+/* ── Mobile adjustments ── */
+@media (max-width: 640px) {
   .portal-sidebar {
-    position: fixed;
-    left: -100%;
-    top: 0;
-    height: 100vh;
-    width: 280px;
-    z-index: 30;
-    transition: left 0.25s ease;
+    width: 80vw;
   }
 
-  .portal-sidebar.open {
-    left: 0;
+  .portal-profile-dropdown {
+    min-width: 200px;
+    right: -10px;
   }
 
-  .portal-overlay.show {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(31, 75, 156, 0.35);
-    z-index: 20;
+  .portal-avatar-tooltip {
+    right: 0;
+    transform: none;
   }
 
-  .portal-menu-btn {
-    display: inline-block;
+  .portal-avatar-tooltip::before {
+    right: 16px;
+    transform: none;
   }
 }
