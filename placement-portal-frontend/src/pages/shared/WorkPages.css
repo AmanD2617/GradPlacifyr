@@ -128,3 +128,162 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══════════ RESUME STATUS CARD ═══════════ */
+
+.resume-status-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.resume-status-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.resume-status-icon {
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.resume-status-title {
+  margin: 0 0 0.15rem !important;
+  font-size: 1rem;
+  color: var(--jims-ink, #102441) !important;
+}
+
+.resume-status-filename {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--jims-ink-soft, #5f6b7a) !important;
+  margin: 0 !important;
+}
+
+.resume-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.resume-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.resume-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid #fecdd3;
+  border-radius: 0.55rem;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.resume-remove-btn:hover {
+  background: #b91c1c;
+  color: #fff;
+  border-color: #b91c1c;
+}
+
+.resume-remove-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.work-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.work-btn svg {
+  vertical-align: -2px;
+  margin-right: 2px;
+}
+
+@media (max-width: 640px) {
+  .resume-status-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .resume-status-actions {
+    width: 100%;
+  }
+}
+
+/* ═══════════ PENDING COMPANIES (ADMIN) ═══════════ */
+
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.pending-company-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.pending-company-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pending-company-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.approve-btn {
+  background: #16a34a !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.approve-btn:hover {
+  background: #15803d !important;
+}
+
+.reject-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+@media (max-width: 640px) {
+  .pending-company-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .pending-company-actions {
+    width: 100%;
+  }
+}
