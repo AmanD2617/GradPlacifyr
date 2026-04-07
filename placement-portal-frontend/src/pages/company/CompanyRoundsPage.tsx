@@ -91,8 +91,22 @@ const CompanyRoundsPage = () => {
       .catch(() => {})
   }
 
+  const [creating, setCreating] = useState(false)
+
   const handleCreateRound = async () => {
-    if (!selectedJobId || !newTitle.trim()) return
+    // Validate inputs
+    if (!selectedJobId) {
+      setError('Job ID is missing. Please select a job first.')
+      return
+    }
+    if (!newTitle.trim()) {
+      setError('Round title is required.')
+      return
+    }
+
+    setError(null)
+    setCreating(true)
+
     try {
       await createRound({
         jobId: selectedJobId,
@@ -106,7 +120,10 @@ const CompanyRoundsPage = () => {
       setShowAddRound(false)
       loadRounds()
     } catch (err: unknown) {
+      console.error('Create round error:', err)
       setError(err instanceof Error ? err.message : 'Failed to create round')
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -172,8 +189,8 @@ const CompanyRoundsPage = () => {
       </article>
 
       {error && (
-        <article className="work-card">
-          <p className="work-error">{error}</p>
+        <article className="work-card" style={{ cursor: 'pointer' }} onClick={() => setError(null)}>
+          <p className="work-error">{error} <span style={{ fontSize: '0.78rem', opacity: 0.7 }}>(click to dismiss)</span></p>
         </article>
       )}
 
@@ -298,8 +315,8 @@ const CompanyRoundsPage = () => {
                     </label>
                   </div>
                   <div className="work-row">
-                    <button className="work-btn" onClick={handleCreateRound} disabled={!newTitle.trim()}>
-                      Create Round
+                    <button className="work-btn" onClick={handleCreateRound} disabled={!newTitle.trim() || creating}>
+                      {creating ? 'Creating...' : 'Create Round'}
                     </button>
                     <button className="work-btn secondary" onClick={() => setShowAddRound(false)}>
                       Cancel

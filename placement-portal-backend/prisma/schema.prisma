@@ -60,6 +60,7 @@ model User {
   jobs             Job[]              @relation("JobCreator")
   applications     Application[]      @relation("StudentApplications")
   profile          StudentProfile?    @relation("UserProfile")
+  companyProfile   CompanyProfile?    @relation("CompanyProfileRel")
   events           Event[]            @relation("EventCreator")
   roundCandidates  RoundCandidate[]   @relation("UserRoundCandidates")
 
@@ -179,6 +180,23 @@ model RoundCandidate {
 
   @@unique([round_id, student_id])
   @@map("round_candidates")
+}
+
+model CompanyProfile {
+  user_id       Int      @id
+  company_name  String?  @db.VarChar(255)
+  about         String?
+  website       String?  @db.VarChar(500)
+  industry      String?  @db.VarChar(255)
+  location      String?  @db.VarChar(255)
+  logo_url      String?  @db.VarChar(500)
+  created_at    DateTime @default(now()) @db.Timestamptz()
+  updated_at    DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  // Relations
+  user User @relation("CompanyProfileRel", fields: [user_id], references: [id])
+
+  @@map("company_profiles")
 }
 
 model Event {

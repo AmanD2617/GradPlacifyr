@@ -191,26 +191,6 @@ const PortalLayout = () => {
           </button>
         </div>
 
-        {/* ── Sidebar user card ── */}
-        {user && (
-          <div className="portal-sidebar-user">
-            <div className="portal-sidebar-avatar">
-              {user.profileImage ? (
-                <img
-                  src={resolveFileUrl(user.profileImage) || ''}
-                  alt={user.name}
-                  className="portal-sidebar-avatar-img"
-                />
-              ) : (
-                <span className="portal-sidebar-avatar-initials">{initials}</span>
-              )}
-            </div>
-            <div className="portal-sidebar-user-info">
-              <span className="portal-sidebar-user-name">{user.name}</span>
-            </div>
-          </div>
-        )}
-
         <nav className="portal-nav">
           {navItems.map((item) => (
             <NavLink

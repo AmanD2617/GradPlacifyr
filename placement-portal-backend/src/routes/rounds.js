@@ -10,18 +10,43 @@ const router = Router()
 
 /** Verify job belongs to the requesting company user (or is admin). */
 async function assertJobAccess(jobId, user) {
-  if (user.role === 'company') {
-    const scope = await buildCompanyJobScope('j', user.id)
-    const job = await prisma.job.findFirst({
-      where: { id: jobId, ...scope.prismaWhere },
+  // Guard: prisma client must be available
+  if (!prisma || !prisma.job) {
+    console.error('Prisma client or prisma.job is undefined — check DB connection / schema generation')
+    throw new AppError('Database service unavailable', 500, 'DB_UNAVAILABLE')
+  }
+
+  if (jobId == null || isNaN(jobId) || jobId <= 0) {
+    throw new AppError('Invalid job ID', 400, 'INVALID_JOB_ID')
+  }
+
+  try {
+    if (user.role === 'company') {
+      const scope = await buildCompanyJobScope('j', user.id)
+      const job = await prisma.job.findFirst({
+        where: { id: jobId, ...scope.prismaWhere },
+        select: { id: true },
+      })
+      if (!job) {
+        throw new AppError('Job not found or you do not have access', 404, 'JOB_NOT_FOUND')
+      }
+      return job
+    }
+
+    // Admin / TPO path
+    const job = await prisma.job.findUnique({
+      where: { id: jobId },
       select: { id: true },
     })
-    if (!job) throw new AppError('Job not found', 404, 'JOB_NOT_FOUND')
+    if (!job) {
+      throw new AppError('Job not found', 404, 'JOB_NOT_FOUND')
+    }
     return job
+  } catch (err) {
+    if (err instanceof AppError) throw err
+    console.error('assertJobAccess unexpected error:', err)
+    throw new AppError('Failed to verify job access', 500, 'INTERNAL_ERROR')
   }
-  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { id: true } })
-  if (!job) throw new AppError('Job not found', 404, 'JOB_NOT_FOUND')
-  return job
 }
 
 // ═══════════ ROUND CRUD ═══════════
@@ -75,10 +100,22 @@ router.post(
   authorizeRoles('admin', 'company', 'tpo'),
   async (req, res, next) => {
     try {
-      const { jobId, title, order, date, description } = req.body
-      if (!jobId || !title) throw new AppError('jobId and title required', 400, 'VALIDATION_ERROR')
+      const { jobId, title, order, date, description } = req.body ?? {}
+
+      // Validate required fields
+      if (!jobId) {
+        throw new AppError('jobId is required', 400, 'VALIDATION_ERROR')
+      }
+      if (!title || !String(title).trim()) {
+        throw new AppError('title is required', 400, 'VALIDATION_ERROR')
+      }
 
       const jid = Number(jobId)
+      if (isNaN(jid) || jid <= 0) {
+        throw new AppError('jobId must be a positive number', 400, 'VALIDATION_ERROR')
+      }
+
+      // Verify job exists and user has access
       await assertJobAccess(jid, req.user)
 
       // Auto-determine order if not provided
