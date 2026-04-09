@@ -183,12 +183,12 @@
   border-top: 4px solid #059669;
 }
 
+.role-card.tpo {
+  border-top: 4px solid #0369a1;
+}
+
 .role-card.admin {
   border-top: 4px solid #7c3aed;
-  grid-column: 1 / -1;
-  max-width: 420px;
-  justify-self: center;
-  width: 100%;
 }
 
 .role-icon {
@@ -219,11 +219,6 @@
 
   .role-grid {
     grid-template-columns: 1fr;
-  }
-
-  .role-card.admin {
-    grid-column: auto;
-    max-width: none;
   }
 }
 

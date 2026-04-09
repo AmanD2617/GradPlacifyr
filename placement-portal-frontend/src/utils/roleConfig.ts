@@ -1,5 +1,5 @@
 import type { Role } from '../context/AuthContext'
-import { GraduationCap, Shield, Briefcase, Building2 } from 'lucide-react'
+import { GraduationCap, Shield, Briefcase, Building2, BookOpenCheck } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface RoleTheme {
@@ -53,6 +53,15 @@ const roleThemes: Record<Role, RoleTheme> = {
     heroGradient: 'linear-gradient(135deg, #047857 0%, #059669 55%, #34d399 100%)',
     sidebarAccent: '#059669',
   },
+  tpo: {
+    label: 'TPO',
+    icon: BookOpenCheck,
+    accent: '#0369a1',
+    accentLight: '#e0f2fe',
+    accentEnd: '#0ea5e9',
+    heroGradient: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 55%, #38bdf8 100%)',
+    sidebarAccent: '#0369a1',
+  },
 }
 
 export function getRoleTheme(role: Role): RoleTheme {
@@ -65,8 +74,10 @@ export function getDashboardTitle(role: Role): string {
     case 'student':
       return 'Student Dashboard'
     case 'admin':
-    case 'hod':
       return 'Admin Dashboard'
+    case 'tpo':
+    case 'hod':
+      return 'TPO Dashboard'
     case 'recruiter':
       return 'Recruiter Dashboard'
     default:

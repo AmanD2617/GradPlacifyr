@@ -16,6 +16,7 @@ enum user_role {
   admin
   recruiter
   hod
+  tpo
 }
 
 enum account_status {

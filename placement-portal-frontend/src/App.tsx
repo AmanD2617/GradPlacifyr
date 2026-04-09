@@ -42,6 +42,7 @@ import RecruiterProfile from './pages/recruiter/RecruiterProfile'
 import RecruiterChangePassword from './pages/recruiter/RecruiterChangePassword'
 import AdminProfile from './pages/admin/AdminProfile'
 import AdminChangePassword from './pages/admin/AdminChangePassword'
+import TpoDashboardHome from './pages/tpo/TpoDashboardHome'
 import './App.css'
 
 /** Listens for the login CustomEvent and shows a role-themed toast */
@@ -93,7 +94,7 @@ function App() {
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
           <Route path="/recruiter/dashboard" element={<Navigate to="/company/dashboard" replace />} />
 
-          <Route element={<ProtectedRoute allowedRoles={['student', 'recruiter', 'admin', 'hod']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['student', 'recruiter', 'admin', 'hod', 'tpo']} />}>
             <Route element={<PortalLayout />}>
               <Route path="/student/dashboard" element={<StudentDashboardHome />} />
               <Route path="/student/profile" element={<StudentProfile />} />
@@ -116,13 +117,18 @@ function App() {
               <Route path="/company/upload-results" element={<CompanyUploadResultsPage />} />
               <Route path="/company/change-password" element={<RecruiterChangePassword />} />
 
-              {/* Redirects from old TPO paths to new Admin paths */}
-              <Route path="/tpo/dashboard" element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="/tpo/approve-jobs" element={<Navigate to="/admin/approve-jobs" replace />} />
-              <Route path="/tpo/monitor-applications" element={<Navigate to="/admin/monitor-applications" replace />} />
-              <Route path="/tpo/reports" element={<Navigate to="/admin/reports" replace />} />
+              {/* ── TPO routes (dedicated dashboard + reused page components) ── */}
+              <Route path="/tpo/dashboard" element={<TpoDashboardHome />} />
+              <Route path="/tpo/profile" element={<AdminProfile />} />
+              <Route path="/tpo/change-password" element={<AdminChangePassword />} />
+              <Route path="/tpo/manage-students" element={<AdminManageStudentsPage />} />
+              <Route path="/tpo/manage-companies" element={<AdminManageCompaniesPage />} />
+              <Route path="/tpo/approve-jobs" element={<TpoApproveJobsPage />} />
+              <Route path="/tpo/monitor-applications" element={<TpoMonitorApplicationsPage />} />
+              <Route path="/tpo/rounds" element={<CompanyRoundsPage />} />
+              <Route path="/tpo/reports" element={<TpoReportsPage />} />
 
-              {/* Admin routes (includes merged TPO features) */}
+              {/* ── Admin routes ── */}
               <Route path="/admin/dashboard" element={<AdminDashboardHome />} />
               <Route path="/admin/profile" element={<AdminProfile />} />
               <Route path="/admin/change-password" element={<AdminChangePassword />} />

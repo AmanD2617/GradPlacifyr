@@ -8,7 +8,7 @@ const ROLE_ALIASES = {
   admin: 'admin',
   recruiter: 'company',
   company: 'company',
-  hod: 'tpo',
+  hod: 'tpo',       // legacy DB value → normalized to tpo
   tpo: 'tpo',
 }
 

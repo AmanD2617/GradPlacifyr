@@ -195,7 +195,7 @@ const TpoDashboardHome = () => {
             icon={FileBarChart}
           />
           <QuickActionCard
-            to="/admin/manage-companies"
+            to="/tpo/manage-companies"
             title="Coordinate Companies"
             description="Handle company-level follow ups"
             icon={Users}

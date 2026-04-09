@@ -158,8 +158,9 @@ const RegisterPage = () => {
                   }}
                 >
                   <option value="student">Student</option>
-                  <option value="admin">TPO / Admin</option>
                   <option value="recruiter">Recruiter</option>
+                  <option value="tpo">TPO</option>
+                  <option value="admin">Admin</option>
                 </select>
               </label>
 

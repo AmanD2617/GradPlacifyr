@@ -40,8 +40,22 @@ const navByRole: Record<Role, NavItem[]> = {
     { label: 'Placement Reports', to: '/admin/reports' },
   ],
   hod: [
-    { label: 'Admin Dashboard', to: '/admin/dashboard' },
-    { label: 'Placement Reports', to: '/admin/reports' },
+    { label: 'TPO Dashboard', to: '/tpo/dashboard' },
+    { label: 'Manage Students', to: '/tpo/manage-students' },
+    { label: 'Manage Companies', to: '/tpo/manage-companies' },
+    { label: 'Approve JNF / TNF', to: '/tpo/approve-jobs' },
+    { label: 'Monitor Applications', to: '/tpo/monitor-applications' },
+    { label: 'Interview Rounds', to: '/tpo/rounds' },
+    { label: 'Placement Reports', to: '/tpo/reports' },
+  ],
+  tpo: [
+    { label: 'TPO Dashboard', to: '/tpo/dashboard' },
+    { label: 'Manage Students', to: '/tpo/manage-students' },
+    { label: 'Manage Companies', to: '/tpo/manage-companies' },
+    { label: 'Approve JNF / TNF', to: '/tpo/approve-jobs' },
+    { label: 'Monitor Applications', to: '/tpo/monitor-applications' },
+    { label: 'Interview Rounds', to: '/tpo/rounds' },
+    { label: 'Placement Reports', to: '/tpo/reports' },
   ],
 }
 
@@ -147,14 +161,16 @@ const PortalLayout = () => {
     student: '/student/profile',
     recruiter: '/company/profile',
     admin: '/admin/profile',
-    hod: '/admin/profile',
+    hod: '/tpo/profile',
+    tpo: '/tpo/profile',
   }
 
   const changePasswordPathByRole: Record<Role, string> = {
     student: '/student/change-password',
     recruiter: '/company/change-password',
     admin: '/admin/change-password',
-    hod: '/admin/change-password',
+    hod: '/tpo/change-password',
+    tpo: '/tpo/change-password',
   }
 
   /* ── Initials from user name ── */

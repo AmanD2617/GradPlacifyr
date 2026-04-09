@@ -1,6 +1,6 @@
 import { apiFetch } from './client'
 
-export type Role = 'student' | 'admin' | 'recruiter' | 'hod'
+export type Role = 'student' | 'admin' | 'recruiter' | 'hod' | 'tpo'
 
 export interface User {
   id: number

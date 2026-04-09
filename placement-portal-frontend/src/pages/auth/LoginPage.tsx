@@ -13,7 +13,7 @@ const LoginPage = () => {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [role, setRole] = useState<Role>(
-    roleFromQuery === 'student' || roleFromQuery === 'admin' || roleFromQuery === 'recruiter'
+    roleFromQuery === 'student' || roleFromQuery === 'admin' || roleFromQuery === 'recruiter' || roleFromQuery === 'tpo'
       ? roleFromQuery
       : 'student'
   )
@@ -71,8 +71,9 @@ const LoginPage = () => {
               onChange={(e) => setRole(e.target.value as Role)}
             >
               <option value="student">Student</option>
-              <option value="admin">TPO / Admin</option>
               <option value="recruiter">Recruiter</option>
+              <option value="tpo">TPO</option>
+              <option value="admin">Admin</option>
             </select>
           </label>
 

@@ -39,8 +39,8 @@ router.post('/send-otp', asyncHandler(handleSendOtp))
 router.post('/verify-otp', asyncHandler(handleVerifyOtp))
 
 // Company approval (admin only)
-router.get('/pending-companies', authenticateToken, authorizeRoles('admin', 'hod'), asyncHandler(handleGetPendingCompanies))
-router.post('/approve-company/:id', authenticateToken, authorizeRoles('admin', 'hod'), asyncHandler(handleApproveCompany))
-router.post('/reject-company/:id', authenticateToken, authorizeRoles('admin', 'hod'), asyncHandler(handleRejectCompany))
+router.get('/pending-companies', authenticateToken, authorizeRoles('admin', 'tpo'), asyncHandler(handleGetPendingCompanies))
+router.post('/approve-company/:id', authenticateToken, authorizeRoles('admin', 'tpo'), asyncHandler(handleApproveCompany))
+router.post('/reject-company/:id', authenticateToken, authorizeRoles('admin', 'tpo'), asyncHandler(handleRejectCompany))
 
 export default router

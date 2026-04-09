@@ -26,7 +26,8 @@ const routes: Record<Role, string> = {
   student: '/student/dashboard',
   admin: '/admin/dashboard',
   recruiter: '/company/dashboard',
-  hod: '/admin/dashboard',
+  hod: '/tpo/dashboard',
+  tpo: '/tpo/dashboard',
 }
 
 function toUser(u: ApiUser): User {

@@ -51,6 +51,15 @@ function buildUserPayload(user) {
   }
 }
 
+// ═══════════ ROLE MAPPING ═══════════
+// The DB enum uses 'hod' as the stored value for TPO users.
+// The auth middleware normalizes 'hod' → 'tpo' for the app layer.
+// When writing to DB, we must map 'tpo' back to 'hod'.
+const APP_TO_DB_ROLE = { tpo: 'hod' }
+function toDbRole(appRole) {
+  return APP_TO_DB_ROLE[appRole] || appRole
+}
+
 // ═══════════ REGISTRATION ═══════════
 
 export async function registerUser({ email, password, role, name, phone, enrollmentNumber }) {
@@ -62,6 +71,9 @@ export async function registerUser({ email, password, role, name, phone, enrollm
 
   const normalizedEmail = email.trim().toLowerCase()
   const cleanPhone = phone.replace(/\D/g, '')
+
+  // Map app-level role to the DB enum value (e.g. 'tpo' → 'hod')
+  const dbRole = toDbRole(role)
 
   // Check for duplicate email
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } })
@@ -89,7 +101,7 @@ export async function registerUser({ email, password, role, name, phone, enrollm
     data: {
       email: normalizedEmail,
       password_hash: hash,
-      role,
+      role: dbRole,
       name: name.trim(),
       phone: cleanPhone,
       enrollment_number: role === 'student' ? enrollmentNumber.trim().toUpperCase() : null,
@@ -169,8 +181,9 @@ export async function loginUser({ email, password, role }) {
 
     const roleMatches =
       normalizedSelected === dbRole ||
-      (normalizedSelected === 'admin' && dbRole === 'hod') ||
-      (normalizedSelected === 'hod' && dbRole === 'admin')
+      // Legacy hod users can log in as tpo
+      (normalizedSelected === 'tpo' && dbRole === 'hod') ||
+      (normalizedSelected === 'hod' && dbRole === 'tpo')
 
     if (!roleMatches) {
       throw new AppError(
