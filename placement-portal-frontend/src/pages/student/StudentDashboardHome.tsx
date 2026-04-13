@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import {
   Briefcase,
+  ChevronRight,
   ClipboardList,
   UserCheck,
   UserCircle,
@@ -12,7 +13,8 @@ import {
   CalendarClock,
   Sparkles,
 } from 'lucide-react'
-import { getJobs } from '../../api/jobs'
+import { Link } from 'react-router-dom'
+import { getJobs, type Job } from '../../api/jobs'
 import { getMyApplications, type StudentApplication } from '../../api/applications'
 import { getMyProfile, type StudentProfile } from '../../api/profile'
 import { getRoleTheme } from '../../utils/roleConfig'
@@ -20,9 +22,11 @@ import {
   ActivityTimeline,
   DashboardLayout,
   EventCalendar,
+  JobOpportunityCard,
   MetricCard,
   QuickActionCard,
   SuggestionPanel,
+  type JobCardData,
   type SuggestionItem,
   type TimelineItem,
 } from '../../components/dashboard'
@@ -56,14 +60,14 @@ const StudentDashboardHome = () => {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [openJobsCount, setOpenJobsCount] = useState(0)
+  const [jobs, setJobs] = useState<Job[]>([])
   const [applications, setApplications] = useState<StudentApplication[]>([])
   const [profile, setProfile] = useState<StudentProfile | null>(null)
 
   useEffect(() => {
     Promise.all([getJobs(), getMyApplications(), getMyProfile()])
-      .then(([jobs, myApplications, myProfile]) => {
-        setOpenJobsCount(jobs.filter((job) => job.status === 'open').length)
+      .then(([allJobs, myApplications, myProfile]) => {
+        setJobs(allJobs)
         setApplications(myApplications)
         setProfile(myProfile)
       })
@@ -78,6 +82,14 @@ const StudentDashboardHome = () => {
       .finally(() => setLoading(false))
   }, [])
 
+  const openJobs = useMemo(() => jobs.filter((j) => j.status === 'open'), [jobs])
+  const openJobsCount = openJobs.length
+
+  const appliedJobIds = useMemo(
+    () => new Set(applications.map((a) => a.jobId)),
+    [applications]
+  )
+
   const shortlistedCount = useMemo(
     () =>
       applications.filter((item) =>
@@ -87,14 +99,19 @@ const StudentDashboardHome = () => {
   )
 
   const interviewCount = useMemo(
-    () => applications.filter((item) => ['test_scheduled', 'interview_scheduled'].includes(item.status)).length,
+    () =>
+      applications.filter((item) =>
+        ['test_scheduled', 'interview_scheduled'].includes(item.status)
+      ).length,
     [applications]
   )
 
   const profileCompletion = useMemo(() => (profile ? scoreProfile(profile) : 0), [profile])
   const readinessScore = useMemo(() => {
     const appFactor = applications.length ? Math.min(20, applications.length * 2) : 0
-    const shortListFactor = applications.length ? Math.round((shortlistedCount / applications.length) * 20) : 0
+    const shortListFactor = applications.length
+      ? Math.round((shortlistedCount / applications.length) * 20)
+      : 0
     return Math.min(100, profileCompletion + appFactor + shortListFactor)
   }, [applications.length, shortlistedCount, profileCompletion])
 
@@ -102,9 +119,9 @@ const StudentDashboardHome = () => {
     if (!profile) return ['Add more skills', 'Upload resume', 'Add certifications']
     const items: string[] = []
     if (!profile.programmingLanguages.trim()) items.push('Add more skills')
-    if (!profile.certifications.trim()) items.push('Add certifications')
+    if (!profile.certifications.trim()) items.push('Add certifications to boost recruiter visibility')
     if (!profile.projects.length) items.push('Add projects to strengthen profile')
-    if (!profile.linkedinUrl.trim()) items.push('Add LinkedIn profile link')
+    if (!profile.linkedinUrl.trim()) items.push('Add your LinkedIn URL to complete your social presence')
     return items.length ? items : ['Maintain regular updates before drives']
   }, [profile])
 
@@ -115,7 +132,12 @@ const StudentDashboardHome = () => {
         title: `Applied to ${item.jobTitle}`,
         description: `${item.company} | Status: ${item.status}`,
         time: new Date(item.appliedAt).toLocaleDateString(),
-        tone: item.status === 'selected' ? 'success' : item.status.includes('interview') ? 'warning' : 'default',
+        tone:
+          item.status === 'selected'
+            ? 'success'
+            : item.status.includes('interview')
+              ? 'warning'
+              : 'default',
       })),
     [applications]
   )
@@ -125,41 +147,149 @@ const StudentDashboardHome = () => {
       {
         id: 'new-jobs',
         title: 'Apply to new jobs this week',
-        detail: `${openJobsCount} opportunities are currently open. Apply early to improve shortlist chances.`,
+        detail: `${openJobsCount} opportunities are open. Early applicants get 2x shortlist rate.`,
       },
       {
         id: 'profile',
         title: 'Improve profile quality',
-        detail: `Current completion is ${profileCompletion}%. Complete missing sections for better recruiter visibility.`,
+        detail: `At ${profileCompletion}% — complete missing sections for better recruiter matches.`,
       },
       {
         id: 'interview',
         title: 'Prepare for interviews',
-        detail: `${interviewCount} interview/test rounds are in your pipeline. Practice role-specific questions daily.`,
+        detail: `${interviewCount} interview round${interviewCount !== 1 ? 's' : ''} in your pipeline. Practice role-specific questions daily.`,
       },
     ],
     [openJobsCount, profileCompletion, interviewCount]
   )
 
+  // Build job card data (top 4 open jobs, with applied status)
+  const jobCards = useMemo<JobCardData[]>(() => {
+    // Show up to 4 jobs: prioritize open, then show applied
+    const cards: JobCardData[] = openJobs.slice(0, 4).map((job) => ({
+      id: job.id,
+      title: job.title,
+      company: job.company,
+      ctc: job.ctc,
+      location: job.location,
+      deadline: job.deadline,
+      employmentType: job.employmentType,
+      status: appliedJobIds.has(job.id) ? 'applied' as const : 'open' as const,
+    }))
+
+    // If fewer than 4 open jobs, pad with recently applied jobs
+    if (cards.length < 4) {
+      const openIds = new Set(cards.map((c) => c.id))
+      const appliedJobs = jobs
+        .filter((j) => appliedJobIds.has(j.id) && !openIds.has(j.id))
+        .slice(0, 4 - cards.length)
+
+      for (const job of appliedJobs) {
+        cards.push({
+          id: job.id,
+          title: job.title,
+          company: job.company,
+          ctc: job.ctc,
+          location: job.location,
+          deadline: job.deadline,
+          employmentType: job.employmentType,
+          status: 'applied',
+        })
+      }
+    }
+
+    return cards
+  }, [openJobs, jobs, appliedJobIds])
+
   const roleTheme = getRoleTheme('student')
 
   return (
     <DashboardLayout
-      greeting={`Welcome, ${user?.name ?? 'Student'}`}
+      greeting={`Welcome back, ${user?.name ?? 'Student'}`}
       title="Student Dashboard"
-      subtitle="Track opportunities, monitor your funnel, and improve placement readiness with guided insights."
+      subtitle="Track opportunities, monitor your funnel & improve your placement readiness."
       compactLayout
       heroGradient={roleTheme.heroGradient}
       roleIcon={roleTheme.icon}
       error={error}
+      readinessLabel={`Placement Readiness: ${readinessLabel(readinessScore)}`}
+      readinessPercent={readinessScore}
+      heroStats={[
+        { label: 'Jobs Open', value: openJobsCount },
+        { label: 'Shortlisted', value: shortlistedCount },
+      ]}
+      primaryContentTitle="Job Opportunities"
+      primaryContentSubtitle="Top picks based on your profile"
+      primaryContentHeaderRight={
+        <Link to="/student/jobs" className="section-view-all">
+          View All Jobs <ChevronRight size={14} />
+        </Link>
+      }
       kpis={
         <>
-          <MetricCard icon={Briefcase} label="Available Opportunities" value={openJobsCount} trend={6} loading={loading} />
-          <MetricCard icon={ClipboardList} label="Applications Submitted" value={applications.length} trend={8} loading={loading} />
-          <MetricCard icon={UserCheck} label="Shortlisted" value={shortlistedCount} trend={4} loading={loading} />
-          <MetricCard icon={UserCircle} label="Profile Completion %" value={`${profileCompletion}%`} trend={3} loading={loading} />
-          <MetricCard icon={Target} label="Placement Readiness Score" value={`${readinessScore}%`} trend={5} loading={loading} />
+          <MetricCard
+            icon={Briefcase}
+            label="Available Opportunities"
+            value={openJobsCount}
+            trend={6}
+            loading={loading}
+          />
+          <MetricCard
+            icon={ClipboardList}
+            label="Applications Submitted"
+            value={applications.length}
+            trend={8}
+            loading={loading}
+          />
+          <MetricCard
+            icon={UserCheck}
+            label="Shortlisted"
+            value={shortlistedCount}
+            trend={4}
+            loading={loading}
+          />
+          <MetricCard
+            icon={UserCircle}
+            label="Profile Completion %"
+            value={`${profileCompletion}%`}
+            trend={3}
+            loading={loading}
+          />
+          <MetricCard
+            icon={Target}
+            label="Placement Readiness"
+            value={`${readinessScore}%`}
+            trend={5}
+            loading={loading}
+          />
         </>
+      }
+      analyticsTitle="Profile Strength"
+      analyticsSubtitle="Improve your profile to boost placement readiness"
+      activityTitle="Recent Activity"
+      activitySubtitle="Your latest placement actions"
+      primaryContent={
+        jobCards.length > 0 ? (
+          <div className="job-opp-scroll">
+            {jobCards.map((job) => (
+              <JobOpportunityCard key={job.id} job={job} />
+            ))}
+          </div>
+        ) : loading ? (
+          <div style={{ display: 'flex', gap: '0.85rem' }}>
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="skeleton-block"
+                style={{ height: 200, flex: 1, borderRadius: '0.95rem' }}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="dashboard-empty">
+            No open opportunities at the moment. Check back soon!
+          </p>
+        )
       }
       calendar={<EventCalendar />}
       analytics={
@@ -171,7 +301,7 @@ const StudentDashboardHome = () => {
           <div className="profile-bar">
             <i style={{ width: `${readinessScore}%` }} />
           </div>
-          <div className="suggestion-panel" style={{ marginTop: '0.55rem' }}>
+          <div className="suggestion-panel" style={{ marginTop: '0.65rem' }}>
             <ul className="suggestion-list">
               {profileSuggestions.map((item) => (
                 <li key={item}>
@@ -196,37 +326,37 @@ const StudentDashboardHome = () => {
         <div className="quick-action-grid">
           <QuickActionCard
             to="/student/jobs"
-            title="Browse Opportunities"
-            description="Explore active jobs and internships"
+            title="Browse Jobs"
+            description="Explore all open opportunities"
             icon={Search}
           />
           <QuickActionCard
             to="/student/profile"
             title="Update Profile"
-            description="Keep academics and skills current"
+            description="Keep academics and skills fresh"
             icon={FilePenLine}
           />
           <QuickActionCard
             to="/student/upload-resume"
             title="Upload Resume"
-            description="Share your latest resume with recruiters"
+            description="Share latest CV with recruiters"
             icon={Upload}
           />
           <QuickActionCard
             to="/student/interview-schedule"
-            title="View Interview Schedule"
+            title="Interview Schedule"
             description="Track tests and interview slots"
             icon={CalendarClock}
           />
           <QuickActionCard
             to="/student/dashboard?tool=ai"
-            title="Generate AI Interview Questions"
-            description="Practice role-based mock questions"
+            title="AI Mock Interview"
+            description="Practice role-based questions"
             icon={Sparkles}
           />
         </div>
       }
-      insights={<SuggestionPanel items={insightSuggestions} />}
+      insights={<SuggestionPanel title="AI Insights" items={insightSuggestions} />}
     />
   )
 }

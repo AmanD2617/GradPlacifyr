@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../../context/AuthContext'
 import {
   Building2,
   Briefcase,
   Inbox,
   CalendarCheck,
-  ClipboardCheck,
   Activity,
+  ClipboardCheck,
   FileBarChart,
   Users,
 } from 'lucide-react'
 import { getJobs, type Job } from '../../api/jobs'
 import { getApplications, type PortalApplication } from '../../api/applications'
+import { getRoleTheme } from '../../utils/roleConfig'
 import {
   ActivityTimeline,
   ChartCard,
   DashboardLayout,
+  EventCalendar,
   MetricCard,
   QuickActionCard,
   SuggestionPanel,
@@ -25,6 +28,7 @@ import {
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const TpoDashboardHome = () => {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [jobs, setJobs] = useState<Job[]>([])
@@ -43,12 +47,23 @@ const TpoDashboardHome = () => {
       .finally(() => setLoading(false))
   }, [])
 
+  // ── Derived metrics ──
+
   const activeCompanies = useMemo(() => new Set(jobs.map((job) => job.company)).size, [jobs])
   const activeJobs = useMemo(() => jobs.filter((job) => job.status === 'open').length, [jobs])
   const interviewsScheduled = useMemo(
     () => applications.filter((item) => ['test_scheduled', 'interview_scheduled'].includes(item.status)).length,
     [applications]
   )
+  const selectedCount = useMemo(
+    () => applications.filter((a) => a.status === 'selected').length,
+    [applications]
+  )
+  const selectionRatio = applications.length
+    ? Math.round((selectedCount / applications.length) * 100)
+    : 0
+
+  // ── Chart data ──
 
   const statusChartData = useMemo(() => {
     const base = new Map<string, number>()
@@ -79,6 +94,8 @@ const TpoDashboardHome = () => {
       .map(([company, count]) => ({ company, count }))
   }, [applications])
 
+  // ── Activity timeline ──
+
   const activityItems = useMemo<TimelineItem[]>(
     () =>
       applications.slice(0, 5).map((item) => ({
@@ -90,6 +107,8 @@ const TpoDashboardHome = () => {
       })),
     [applications]
   )
+
+  // ── Suggestions ──
 
   const suggestionItems = useMemo<SuggestionItem[]>(
     () => [
@@ -112,33 +131,27 @@ const TpoDashboardHome = () => {
     [activeJobs, interviewsScheduled]
   )
 
+  const roleTheme = getRoleTheme('tpo')
+
   return (
     <DashboardLayout
+      greeting={`Welcome back, ${user?.name ?? 'TPO'}`}
       title="TPO Dashboard"
       subtitle="Oversee drive operations, maintain pipeline movement, and keep placement performance on track."
+      compactLayout
+      heroGradient={roleTheme.heroGradient}
+      roleIcon={roleTheme.icon}
       error={error}
-      kpis={
-        <>
-          <MetricCard icon={Building2} label="Active Companies" value={activeCompanies} trend={4} loading={loading} />
-          <MetricCard icon={Briefcase} label="Active Jobs" value={activeJobs} trend={6} loading={loading} />
-          <MetricCard icon={Inbox} label="Applications Received" value={applications.length} trend={9} loading={loading} />
-          <MetricCard
-            icon={CalendarCheck}
-            label="Interviews Scheduled"
-            value={interviewsScheduled}
-            trend={5}
-            loading={loading}
-          />
-          <MetricCard
-            icon={Activity}
-            label="Selection Ratio"
-            value={applications.length ? `${Math.round((applications.filter((a) => a.status === 'selected').length / applications.length) * 100)}%` : '0%'}
-            trend={3}
-            loading={loading}
-          />
-        </>
-      }
-      analytics={
+      readinessLabel={`Placement Rate: ${selectionRatio}%`}
+      readinessPercent={selectionRatio}
+      heroStats={[
+        { label: 'Active Drives', value: activeJobs },
+        { label: 'Companies', value: activeCompanies },
+        { label: 'Selected', value: selectedCount },
+      ]}
+      primaryContentTitle="Drive Analytics"
+      primaryContentSubtitle="Application funnel and company-wise distribution"
+      primaryContent={
         <div className="chart-grid">
           <ChartCard
             title="Applications by Status"
@@ -156,7 +169,7 @@ const TpoDashboardHome = () => {
               kind: 'line',
               data: appTrendData,
               xKey: 'month',
-              series: [{ key: 'applications', label: 'Applications', color: '#1f4b9c' }],
+              series: [{ key: 'applications', label: 'Applications', color: '#0369a1' }],
             }}
             loading={loading}
           />
@@ -173,6 +186,37 @@ const TpoDashboardHome = () => {
           />
         </div>
       }
+      kpis={
+        <>
+          <MetricCard icon={Building2} label="Active Companies" value={activeCompanies} trend={4} loading={loading} />
+          <MetricCard icon={Briefcase} label="Active Jobs" value={activeJobs} trend={6} loading={loading} />
+          <MetricCard icon={Inbox} label="Applications Received" value={applications.length} trend={9} loading={loading} />
+          <MetricCard
+            icon={CalendarCheck}
+            label="Interviews Scheduled"
+            value={interviewsScheduled}
+            trend={5}
+            loading={loading}
+          />
+          <MetricCard
+            icon={Activity}
+            label="Selection Ratio"
+            value={`${selectionRatio}%`}
+            trend={3}
+            loading={loading}
+          />
+        </>
+      }
+      calendar={<EventCalendar canManage />}
+      analyticsTitle="Placement Health"
+      analyticsSubtitle="Key indicators and coverage metrics"
+      analytics={
+        <div className="chart-grid">
+          {/* empty placeholder — all charts are in primaryContent */}
+        </div>
+      }
+      activityTitle="Drive Activity"
+      activitySubtitle="Recent student movements across rounds"
       activity={<ActivityTimeline items={activityItems} emptyText="No active notifications in the queue." />}
       quickActions={
         <div className="quick-action-grid">
@@ -202,7 +246,7 @@ const TpoDashboardHome = () => {
           />
         </div>
       }
-      insights={<SuggestionPanel items={suggestionItems} />}
+      insights={<SuggestionPanel title="AI Insights" items={suggestionItems} />}
     />
   )
 }

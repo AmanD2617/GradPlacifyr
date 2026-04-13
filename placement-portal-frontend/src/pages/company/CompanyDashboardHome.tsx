@@ -47,6 +47,9 @@ const CompanyDashboardHome = () => {
       .finally(() => setLoading(false))
   }, [])
 
+  // ── Derived metrics ──
+
+  const openJobs = useMemo(() => jobs.filter((j) => j.status === 'open').length, [jobs])
   const shortlistedCount = useMemo(
     () =>
       applications.filter((item) =>
@@ -58,6 +61,15 @@ const CompanyDashboardHome = () => {
     () => applications.filter((item) => item.status === 'interview_scheduled').length,
     [applications]
   )
+  const selectedCount = useMemo(
+    () => applications.filter((a) => a.status === 'selected').length,
+    [applications]
+  )
+  const conversionRate = applications.length
+    ? Math.round((selectedCount / applications.length) * 100)
+    : 0
+
+  // ── Chart data ──
 
   const statusChartData = useMemo(() => {
     const base = new Map<string, number>()
@@ -88,6 +100,8 @@ const CompanyDashboardHome = () => {
       .map(([job, count]) => ({ job, count }))
   }, [applications])
 
+  // ── Activity timeline ──
+
   const activityItems = useMemo<TimelineItem[]>(
     () =>
       applications.slice(0, 5).map((item) => ({
@@ -99,6 +113,8 @@ const CompanyDashboardHome = () => {
       })),
     [applications]
   )
+
+  // ── Suggestions ──
 
   const insightItems = useMemo<SuggestionItem[]>(
     () => [
@@ -125,30 +141,23 @@ const CompanyDashboardHome = () => {
 
   return (
     <DashboardLayout
-      greeting={`Welcome, ${user?.name ?? 'Recruiter'}`}
+      greeting={`Welcome back, ${user?.name ?? 'Recruiter'}`}
       title="Recruiter Dashboard"
       subtitle="Monitor job performance, track applicants, and accelerate hiring outcomes with live analytics."
       compactLayout
       heroGradient={roleTheme.heroGradient}
       roleIcon={roleTheme.icon}
       error={error}
-      kpis={
-        <>
-          <MetricCard icon={BriefcaseBusiness} label="Total Jobs Posted" value={jobs.length} trend={7} loading={loading} />
-          <MetricCard icon={Users} label="Total Applicants" value={applications.length} trend={10} loading={loading} />
-          <MetricCard icon={UserCheck} label="Shortlisted Candidates" value={shortlistedCount} trend={5} loading={loading} />
-          <MetricCard icon={CalendarCheck} label="Interview Scheduled" value={interviewsCount} trend={4} loading={loading} />
-          <MetricCard
-            icon={ClipboardPen}
-            label="Open Jobs"
-            value={jobs.filter((job) => job.status === 'open').length}
-            trend={3}
-            loading={loading}
-          />
-        </>
-      }
-      calendar={<EventCalendar canManage />}
-      analytics={
+      readinessLabel={`Hiring Pipeline: ${conversionRate}% Conversion`}
+      readinessPercent={conversionRate}
+      heroStats={[
+        { label: 'Jobs Posted', value: jobs.length },
+        { label: 'Applicants', value: applications.length },
+        { label: 'Selected', value: selectedCount },
+      ]}
+      primaryContentTitle="Hiring Analytics"
+      primaryContentSubtitle="Application funnel, applicant trends, and top-performing roles"
+      primaryContent={
         <div className="chart-grid">
           <ChartCard
             title="Applications by Status"
@@ -166,7 +175,7 @@ const CompanyDashboardHome = () => {
               kind: 'line',
               data: trendData,
               xKey: 'month',
-              series: [{ key: 'applicants', label: 'Applicants', color: '#1f4b9c' }],
+              series: [{ key: 'applicants', label: 'Applicants', color: '#059669' }],
             }}
             loading={loading}
           />
@@ -183,6 +192,43 @@ const CompanyDashboardHome = () => {
           />
         </div>
       }
+      kpis={
+        <>
+          <MetricCard icon={BriefcaseBusiness} label="Total Jobs Posted" value={jobs.length} trend={7} loading={loading} />
+          <MetricCard icon={Users} label="Total Applicants" value={applications.length} trend={10} loading={loading} />
+          <MetricCard icon={UserCheck} label="Shortlisted Candidates" value={shortlistedCount} trend={5} loading={loading} />
+          <MetricCard icon={CalendarCheck} label="Interviews Scheduled" value={interviewsCount} trend={4} loading={loading} />
+          <MetricCard
+            icon={ClipboardPen}
+            label="Open Jobs"
+            value={openJobs}
+            trend={3}
+            loading={loading}
+          />
+        </>
+      }
+      calendar={<EventCalendar canManage />}
+      analyticsTitle="Conversion Metrics"
+      analyticsSubtitle="Shortlist and selection breakdown"
+      analytics={
+        <div className="chart-grid">
+          <ChartCard
+            title="Selection Funnel"
+            subtitle="Shortlisted vs selected"
+            config={{
+              kind: 'donut',
+              data: [
+                { name: 'Selected', value: selectedCount },
+                { name: 'Shortlisted', value: Math.max(shortlistedCount - selectedCount, 0) },
+                { name: 'Pending', value: Math.max(applications.length - shortlistedCount, 0) },
+              ],
+            }}
+            loading={loading}
+          />
+        </div>
+      }
+      activityTitle="Hiring Activity"
+      activitySubtitle="Recent applicant actions and updates"
       activity={<ActivityTimeline items={activityItems} emptyText="No recent applicant activity yet." />}
       quickActions={
         <div className="quick-action-grid">
@@ -212,7 +258,7 @@ const CompanyDashboardHome = () => {
           />
         </div>
       }
-      insights={<SuggestionPanel items={insightItems} />}
+      insights={<SuggestionPanel title="AI Insights" items={insightItems} />}
     />
   )
 }

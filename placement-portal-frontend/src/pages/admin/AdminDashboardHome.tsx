@@ -3,12 +3,9 @@ import { useAuth } from '../../context/AuthContext'
 import {
   GraduationCap,
   Building2,
-  BriefcaseBusiness,
+  Briefcase,
   ChartNoAxesColumn,
   Users,
-  Briefcase,
-  CalendarCheck,
-  Activity,
   ClipboardCheck,
   FileBarChart,
   Handshake,
@@ -56,7 +53,7 @@ const AdminDashboardHome = () => {
       .finally(() => setLoading(false))
   }, [])
 
-  // ── Derived metrics (merged from Admin + TPO) ──────────────────────────
+  // ── Derived metrics ──
 
   const activeCompanies = useMemo(() => new Set(jobs.map((j) => j.company)).size, [jobs])
   const activeJobs = useMemo(() => jobs.filter((j) => j.status === 'open').length, [jobs])
@@ -76,9 +73,8 @@ const AdminDashboardHome = () => {
     [applications]
   )
 
-  // ── Chart data ─────────────────────────────────────────────────────────
+  // ── Chart data ──
 
-  // Placement pipeline (selected / in-progress / rejected)
   const placementStatsData = useMemo(() => {
     const rejected = applications.filter((a) => a.status === 'rejected').length
     const inProgress = Math.max(applications.length - selectedCount - rejected, 0)
@@ -89,7 +85,6 @@ const AdminDashboardHome = () => {
     ]
   }, [applications, selectedCount])
 
-  // Granular status breakdown (from TPO — more detailed funnel)
   const statusBreakdownData = useMemo(() => {
     const base = new Map<string, number>()
     for (const app of applications) {
@@ -98,7 +93,6 @@ const AdminDashboardHome = () => {
     return Array.from(base.entries()).map(([name, value]) => ({ name, value }))
   }, [applications])
 
-  // Monthly application trend
   const trendData = useMemo(() => {
     const monthMap = new Map<string, number>()
     for (const app of applications) {
@@ -109,7 +103,6 @@ const AdminDashboardHome = () => {
     return Array.from(monthMap.entries()).map(([month, applicationsCount]) => ({ month, applications: applicationsCount }))
   }, [applications])
 
-  // Branch-wise distribution
   const branchDistribution = useMemo(() => [
     { branch: 'CSE/IT', students: Math.round(students.length * 0.36), placed: Math.round(students.length * 0.36 * 0.52) },
     { branch: 'ECE', students: Math.round(students.length * 0.24), placed: Math.round(students.length * 0.24 * 0.48) },
@@ -117,7 +110,6 @@ const AdminDashboardHome = () => {
     { branch: 'BCA', students: Math.round(students.length * 0.18), placed: Math.round(students.length * 0.18 * 0.42) },
   ], [students.length])
 
-  // Company-wise applications (from TPO)
   const companyDistribution = useMemo(() => {
     const byCompany = new Map<string, number>()
     for (const app of applications) {
@@ -129,7 +121,7 @@ const AdminDashboardHome = () => {
       .map(([company, count]) => ({ company, count }))
   }, [applications])
 
-  // ── Activity timeline ──────────────────────────────────────────────────
+  // ── Activity timeline ──
 
   const activityItems = useMemo<TimelineItem[]>(
     () =>
@@ -143,7 +135,7 @@ const AdminDashboardHome = () => {
     [applications]
   )
 
-  // ── Smart suggestions (merged) ─────────────────────────────────────────
+  // ── Smart suggestions ──
 
   const suggestionItems = useMemo<SuggestionItem[]>(
     () => [
@@ -176,50 +168,29 @@ const AdminDashboardHome = () => {
     [placementPercentage, companies.length, activeJobs, interviewsScheduled, students.length]
   )
 
-  // ── Render ─────────────────────────────────────────────────────────────
+  // ── Render ──
 
   const roleTheme = getRoleTheme(user?.role ?? 'admin')
 
   return (
     <DashboardLayout
-      greeting={`Welcome, ${user?.name ?? 'Admin'}`}
+      greeting={`Welcome back, ${user?.name ?? 'Admin'}`}
       title="Admin Dashboard"
       subtitle="Unified view of platform performance, drive operations, user growth, and placement outcomes."
       compactLayout
       heroGradient={roleTheme.heroGradient}
       roleIcon={roleTheme.icon}
       error={error}
-      kpis={
-        <>
-          <MetricCard icon={GraduationCap} label="Total Students" value={students.length} trend={5} loading={loading} />
-          <MetricCard icon={Building2} label="Active Companies" value={activeCompanies} trend={4} loading={loading} />
-          <MetricCard icon={Briefcase} label="Active Jobs" value={activeJobs} trend={6} loading={loading} />
-          <MetricCard
-            icon={ChartNoAxesColumn}
-            label="Placement %"
-            value={`${placementPercentage}%`}
-            trend={3}
-            loading={loading}
-          />
-          <MetricCard icon={Users} label="Applications" value={applications.length} trend={8} loading={loading} />
-          <MetricCard
-            icon={CalendarCheck}
-            label="Interviews Scheduled"
-            value={interviewsScheduled}
-            trend={5}
-            loading={loading}
-          />
-          <MetricCard
-            icon={Activity}
-            label="Selection Ratio"
-            value={applications.length ? `${Math.round((selectedCount / applications.length) * 100)}%` : '0%'}
-            trend={3}
-            loading={loading}
-          />
-        </>
-      }
-      calendar={<EventCalendar canManage />}
-      analytics={
+      readinessLabel={`System Health: Active`}
+      readinessPercent={placementPercentage}
+      heroStats={[
+        { label: 'Students', value: students.length },
+        { label: 'Companies', value: companies.length },
+        { label: 'Placement %', value: `${placementPercentage}%` },
+      ]}
+      primaryContentTitle="Platform Analytics"
+      primaryContentSubtitle="Placement pipeline, application trends, and branch-wise distribution"
+      primaryContent={
         <div className="chart-grid">
           <ChartCard
             title="Placement Status Overview"
@@ -246,7 +217,7 @@ const AdminDashboardHome = () => {
               kind: 'line',
               data: trendData,
               xKey: 'month',
-              series: [{ key: 'applications', label: 'Applications', color: '#1f4b9c' }],
+              series: [{ key: 'applications', label: 'Applications', color: '#7c3aed' }],
             }}
             loading={loading}
           />
@@ -258,7 +229,7 @@ const AdminDashboardHome = () => {
               data: branchDistribution,
               xKey: 'branch',
               series: [
-                { key: 'students', label: 'Students', color: '#20468b' },
+                { key: 'students', label: 'Students', color: '#5b21b6' },
                 { key: 'placed', label: 'Placed', color: '#daa824' },
               ],
             }}
@@ -277,6 +248,43 @@ const AdminDashboardHome = () => {
           />
         </div>
       }
+      kpis={
+        <>
+          <MetricCard icon={GraduationCap} label="Total Students" value={students.length} trend={5} loading={loading} />
+          <MetricCard icon={Building2} label="Active Companies" value={activeCompanies} trend={4} loading={loading} />
+          <MetricCard icon={Briefcase} label="Active Jobs" value={activeJobs} trend={6} loading={loading} />
+          <MetricCard
+            icon={ChartNoAxesColumn}
+            label="Placement %"
+            value={`${placementPercentage}%`}
+            trend={3}
+            loading={loading}
+          />
+          <MetricCard icon={Users} label="Applications" value={applications.length} trend={8} loading={loading} />
+        </>
+      }
+      calendar={<EventCalendar canManage />}
+      analyticsTitle="Detailed Metrics"
+      analyticsSubtitle="Interviews, selection ratios, and scheduling"
+      analytics={
+        <div className="chart-grid">
+          <ChartCard
+            title="Interview Pipeline"
+            subtitle="Scheduled vs selected"
+            config={{
+              kind: 'donut',
+              data: [
+                { name: 'Interviews', value: interviewsScheduled },
+                { name: 'Selected', value: selectedCount },
+                { name: 'Other', value: Math.max(applications.length - interviewsScheduled - selectedCount, 0) },
+              ],
+            }}
+            loading={loading}
+          />
+        </div>
+      }
+      activityTitle="Platform Activity"
+      activitySubtitle="Recent actions across all users"
       activity={<ActivityTimeline items={activityItems} emptyText="No recent platform activity yet." />}
       quickActions={
         <div className="quick-action-grid">
@@ -312,7 +320,7 @@ const AdminDashboardHome = () => {
           />
         </div>
       }
-      insights={<SuggestionPanel items={suggestionItems} />}
+      insights={<SuggestionPanel title="AI Insights" items={suggestionItems} />}
     />
   )
 }
