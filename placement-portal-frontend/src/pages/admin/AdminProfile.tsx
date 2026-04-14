@@ -110,18 +110,17 @@ const AdminProfile = () => {
     setError(null)
 
     try {
-      const token = localStorage.getItem('placement_token')
       const formData = new FormData()
       formData.append('avatar', file)
 
       const res = await fetch(`${API_BASE}/upload/avatar`, {
         method: 'POST',
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        credentials: 'include', // HttpOnly cookie auth
         body: formData,
       })
 
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error?.message || data?.error || 'Upload failed')
+      if (!res.ok) throw new Error((data as any)?.error?.message || (data as any)?.error || 'Upload failed')
 
       setUserData((prev) => prev ? { ...prev, profileImage: data.profileImage } : prev)
       updateProfileImage(data.profileImage)

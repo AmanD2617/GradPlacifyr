@@ -52,15 +52,31 @@ async function assertJobAccess(jobId, user) {
 // ═══════════ ROUND CRUD ═══════════
 
 // GET /api/rounds?jobId=:jobId — list rounds for a job
+// Students only see rounds for jobs they've applied to (enforced below)
 router.get(
   '/',
   authenticateToken,
+  authorizeRoles('admin', 'company', 'tpo', 'student'),
   async (req, res, next) => {
     try {
       const { jobId } = req.query
       if (!jobId) throw new AppError('jobId query param required', 400, 'VALIDATION_ERROR')
 
       const jid = Number(jobId)
+
+      // ═══════════ STUDENT SCOPE ═══════════
+      // Students can only view rounds for jobs they have applied to
+      if (req.user.role === 'student') {
+        const application = await prisma.application.findUnique({
+          where: {
+            job_id_student_id: { job_id: jid, student_id: req.user.id },
+          },
+          select: { id: true },
+        })
+        if (!application) {
+          throw new AppError('You have not applied to this job', 403, 'FORBIDDEN')
+        }
+      }
 
       const rounds = await prisma.round.findMany({
         where: { job_id: jid },
@@ -108,6 +124,12 @@ router.post(
       }
       if (!title || !String(title).trim()) {
         throw new AppError('title is required', 400, 'VALIDATION_ERROR')
+      }
+      if (String(title).length > 255) {
+        throw new AppError('title must be 255 characters or fewer', 400, 'VALIDATION_ERROR')
+      }
+      if (description && String(description).length > 2000) {
+        throw new AppError('description must be 2000 characters or fewer', 400, 'VALIDATION_ERROR')
       }
 
       const jid = Number(jobId)
@@ -167,6 +189,13 @@ router.put(
       await assertJobAccess(round.job_id, req.user)
 
       const { title, order, date, description } = req.body
+
+      if (title !== undefined && String(title).length > 255) {
+        throw new AppError('title must be 255 characters or fewer', 400, 'VALIDATION_ERROR')
+      }
+      if (description !== undefined && description && String(description).length > 2000) {
+        throw new AppError('description must be 2000 characters or fewer', 400, 'VALIDATION_ERROR')
+      }
 
       await prisma.round.update({
         where: { id: roundId },
@@ -425,10 +454,14 @@ router.get(
   async (req, res, next) => {
     try {
       const studentId = req.user.id
+      const page  = Math.max(1, parseInt(req.query.page  ?? '1',   10) || 1)
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit ?? '20', 10) || 20))
 
-      // Get all applications with their rounds
+      // Get student applications with their round data (paginated)
       const applications = await prisma.application.findMany({
         where: { student_id: studentId },
+        take: limit,
+        skip: (page - 1) * limit,
         select: {
           id: true,
           job_id: true,

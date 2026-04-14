@@ -1,7 +1,17 @@
 import { Router } from 'express'
+import crypto from 'crypto'
+import multer from 'multer'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import fs from 'fs'
 import prisma from '../db/prisma.js'
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js'
 import { AppError } from '../utils/appError.js'
+import { validateFileOnDisk } from '../utils/validateFileType.js'
+import { safeDeleteStoredFile } from '../utils/safeDeleteFile.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const router = Router()
 
@@ -26,8 +36,6 @@ function normaliseRow(row) {
 }
 
 // ── GET /api/company-profile/me ────────────────────────────────────────────
-// Returns the company profile for the authenticated recruiter/admin user.
-// Also includes basic user fields (name, email, phone, profileImage).
 router.get(
   '/me',
   authenticateToken,
@@ -48,7 +56,6 @@ router.get(
 
       if (!user) throw new AppError('User not found', 404, 'USER_NOT_FOUND')
 
-      // Fetch company profile (may not exist yet)
       const profile = await prisma.companyProfile.findUnique({
         where: { user_id: req.user.id },
       })
@@ -71,7 +78,6 @@ router.get(
 )
 
 // ── PUT /api/company-profile/me ────────────────────────────────────────────
-// Updates both user fields (name, phone) and company profile fields.
 router.put(
   '/me',
   authenticateToken,
@@ -88,7 +94,6 @@ router.put(
         location,
       } = req.body ?? {}
 
-      // Update user-level fields
       const userUpdate = {}
       if (name !== undefined) userUpdate.name = String(name).trim() || null
       if (phone !== undefined) userUpdate.phone = String(phone).trim() || null
@@ -100,16 +105,14 @@ router.put(
         })
       }
 
-      // Upsert company profile
       const profileData = {
-        company_name: companyName !== undefined ? (String(companyName).trim() || null) : undefined,
-        about: about !== undefined ? (String(about).trim() || null) : undefined,
-        website: website !== undefined ? (String(website).trim() || null) : undefined,
-        industry: industry !== undefined ? (String(industry).trim() || null) : undefined,
-        location: location !== undefined ? (String(location).trim() || null) : undefined,
+        company_name: companyName !== undefined ? (String(companyName).trim().slice(0, 255) || null) : undefined,
+        about:        about       !== undefined ? (String(about).trim().slice(0, 3000)       || null) : undefined,
+        website:      website     !== undefined ? (String(website).trim().slice(0, 500)       || null) : undefined,
+        industry:     industry    !== undefined ? (String(industry).trim().slice(0, 255)      || null) : undefined,
+        location:     location    !== undefined ? (String(location).trim().slice(0, 255)      || null) : undefined,
       }
 
-      // Remove undefined keys so Prisma doesn't overwrite with null
       const cleanData = Object.fromEntries(
         Object.entries(profileData).filter(([, v]) => v !== undefined)
       )
@@ -123,7 +126,6 @@ router.put(
         update: cleanData,
       })
 
-      // Fetch updated user
       const user = await prisma.user.findUnique({
         where: { id: req.user.id },
         select: {
@@ -154,17 +156,6 @@ router.put(
 )
 
 // ── POST /api/company-profile/logo ─────────────────────────────────────────
-// Upload company logo using the existing upload infrastructure.
-// Expects multipart form with 'logo' field — delegates to the upload route's
-// multer config pattern but stores in a separate path.
-import multer from 'multer'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import fs from 'fs'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
 const logosDir = path.join(__dirname, '..', '..', 'uploads', 'logos')
 if (!fs.existsSync(logosDir)) {
   fs.mkdirSync(logosDir, { recursive: true })
@@ -172,19 +163,20 @@ if (!fs.existsSync(logosDir)) {
 
 const logoStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, logosDir),
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
+    // UUID filename — prevents enumeration
     const ext = path.extname(file.originalname).toLowerCase()
-    const uniqueName = `company-${req.user.id}-${Date.now()}${ext}`
-    cb(null, uniqueName)
+    cb(null, `${crypto.randomUUID()}${ext}`)
   },
 })
 
 const logoFilter = (_req, file, cb) => {
-  const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+  // SVG REMOVED — can contain embedded JavaScript (XSS vector)
+  const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
   if (allowed.includes(file.mimetype)) {
     cb(null, true)
   } else {
-    cb(new AppError('Only JPEG, PNG, GIF, WebP, and SVG images are allowed', 400, 'INVALID_FILE_TYPE'), false)
+    cb(new AppError('Only JPEG, PNG, GIF, and WebP images are allowed', 400, 'INVALID_FILE_TYPE'), false)
   }
 }
 
@@ -216,22 +208,18 @@ router.post(
         throw new AppError('No image file provided', 400, 'NO_FILE')
       }
 
+      // Magic byte validation — reject spoofed MIME types
+      await validateFileOnDisk(req.file.path, 'image')
+
       const logoUrl = `/uploads/logos/${req.file.filename}`
 
-      // Delete old logo if exists
+      // Delete old logo if exists (path-traversal-safe)
       const existing = await prisma.companyProfile.findUnique({
         where: { user_id: req.user.id },
         select: { logo_url: true },
       })
+      safeDeleteStoredFile(existing?.logo_url)
 
-      if (existing?.logo_url) {
-        const oldPath = path.join(__dirname, '..', '..', existing.logo_url)
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath)
-        }
-      }
-
-      // Upsert profile with new logo URL
       await prisma.companyProfile.upsert({
         where: { user_id: req.user.id },
         create: { user_id: req.user.id, logo_url: logoUrl },

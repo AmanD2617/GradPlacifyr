@@ -12,52 +12,38 @@ export interface UploadAvatarResponse {
   }
 }
 
+/** Shared fetch helper for multipart form data (no Content-Type — browser sets it with boundary). */
+async function fetchForm<T>(url: string, init: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    credentials: 'include', // send HttpOnly cookie
+  })
+
+  const data = await res.json().catch(() => ({}))
+
+  if (!res.ok) {
+    const message =
+      typeof data === 'string'
+        ? data
+        : (data as any)?.error?.message || (data as any)?.error || 'Upload failed'
+    throw new Error(message)
+  }
+
+  return data as T
+}
+
 export async function uploadAvatar(file: File): Promise<UploadAvatarResponse> {
-  const token = localStorage.getItem('placement_token')
   const formData = new FormData()
   formData.append('avatar', file)
 
-  const res = await fetch(`${API_BASE}/upload/avatar`, {
+  return fetchForm<UploadAvatarResponse>(`${API_BASE}/upload/avatar`, {
     method: 'POST',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
     body: formData,
   })
-
-  const data = await res.json().catch(() => ({}))
-
-  if (!res.ok) {
-    const message =
-      typeof data === 'string'
-        ? data
-        : data?.error?.message || data?.error || 'Upload failed'
-    throw new Error(message)
-  }
-
-  return data as UploadAvatarResponse
 }
 
 export async function deleteAvatar(): Promise<{ message: string }> {
-  const token = localStorage.getItem('placement_token')
-
-  const res = await fetch(`${API_BASE}/upload/avatar`, {
+  return fetchForm<{ message: string }>(`${API_BASE}/upload/avatar`, {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
   })
-
-  const data = await res.json().catch(() => ({}))
-
-  if (!res.ok) {
-    const message =
-      typeof data === 'string'
-        ? data
-        : data?.error?.message || data?.error || 'Delete failed'
-    throw new Error(message)
-  }
-
-  return data as { message: string }
 }

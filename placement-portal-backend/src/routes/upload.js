@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import crypto from 'crypto'
 import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -6,27 +7,29 @@ import fs from 'fs'
 import prisma from '../db/prisma.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { AppError } from '../utils/appError.js'
+import { validateFileOnDisk } from '../utils/validateFileType.js'
+import { safeDeleteStoredFile } from '../utils/safeDeleteFile.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '..', '..', 'uploads', 'avatars')
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true })
 }
 
-// Multer config: store files with unique names
+// Multer config: UUID filenames to prevent enumeration
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase()
-    const uniqueName = `user-${req.user.id}-${Date.now()}${ext}`
+    const uniqueName = `${crypto.randomUUID()}${ext}`
     cb(null, uniqueName)
   },
 })
 
 const fileFilter = (_req, file, cb) => {
+  // No SVG — it can contain embedded JavaScript (XSS vector)
   const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
   if (allowed.includes(file.mimetype)) {
     cb(null, true)
@@ -38,12 +41,12 @@ const fileFilter = (_req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  limits: { fileSize: 5 * 1024 * 1024 },
 })
 
 const router = Router()
 
-// POST /api/upload/avatar — upload profile image
+// POST /api/upload/avatar
 router.post(
   '/avatar',
   authenticateToken,
@@ -65,22 +68,18 @@ router.post(
         throw new AppError('No image file provided', 400, 'NO_FILE')
       }
 
+      // Magic byte validation — reject spoofed MIME types
+      await validateFileOnDisk(req.file.path, 'image')
+
       const imageUrl = `/uploads/avatars/${req.file.filename}`
 
-      // Delete old avatar file if it exists
+      // Delete old avatar file if it exists (path-traversal-safe)
       const currentUser = await prisma.user.findUnique({
         where: { id: req.user.id },
         select: { profile_image: true },
       })
+      safeDeleteStoredFile(currentUser?.profile_image)
 
-      if (currentUser?.profile_image) {
-        const oldPath = path.join(__dirname, '..', '..', currentUser.profile_image)
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath)
-        }
-      }
-
-      // Save new image URL in database
       const updatedUser = await prisma.user.update({
         where: { id: req.user.id },
         data: { profile_image: imageUrl },
@@ -98,7 +97,7 @@ router.post(
   }
 )
 
-// DELETE /api/upload/avatar — remove profile image
+// DELETE /api/upload/avatar
 router.delete(
   '/avatar',
   authenticateToken,
@@ -109,12 +108,7 @@ router.delete(
         select: { profile_image: true },
       })
 
-      if (currentUser?.profile_image) {
-        const filePath = path.join(__dirname, '..', '..', currentUser.profile_image)
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath)
-        }
-      }
+      safeDeleteStoredFile(currentUser?.profile_image)
 
       await prisma.user.update({
         where: { id: req.user.id },

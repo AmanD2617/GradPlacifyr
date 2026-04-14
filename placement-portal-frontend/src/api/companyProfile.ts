@@ -48,15 +48,12 @@ export async function updateCompanyProfile(data: {
 }
 
 export async function uploadCompanyLogo(file: File): Promise<{ logoUrl: string }> {
-  const token = localStorage.getItem('placement_token')
   const formData = new FormData()
   formData.append('logo', file)
 
   const res = await fetch(`${API_BASE}/company-profile/logo`, {
     method: 'POST',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    credentials: 'include', // HttpOnly cookie auth
     body: formData,
   })
 
@@ -66,7 +63,7 @@ export async function uploadCompanyLogo(file: File): Promise<{ logoUrl: string }
     const message =
       typeof data === 'string'
         ? data
-        : data?.error?.message || data?.error || 'Logo upload failed'
+        : (data as any)?.error?.message || (data as any)?.error || 'Logo upload failed'
     throw new Error(message)
   }
 

@@ -1,10 +1,16 @@
 import { Router } from 'express'
-import { authenticateToken, authorizeRoles } from '../middleware/auth.js'
+import { authenticateToken, authorizeRoles, optionalAuthenticateToken } from '../middleware/auth.js'
 import { asyncHandler } from '../middleware/asyncHandler.js'
-import { rateLimit } from '../middleware/rateLimiter.js'
+import {
+  authLimiter,
+  loginLimiter,
+  sensitiveLimiter,
+  otpVerifyLimiter,
+} from '../middleware/rateLimiter.js'
 import {
   forgotPassword,
   login,
+  logout,
   me,
   register,
   resetPassword,
@@ -15,28 +21,31 @@ import {
   handleGetPendingCompanies,
   handleApproveCompany,
   handleRejectCompany,
+  handleChangePassword,
 } from '../controllers/authController.js'
 
 const router = Router()
 
-// Rate limiters
-const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: 'Too many requests, please try again later.' })
-const loginLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: 'Too many login attempts. Please wait a minute and try again.' })
-
 // Core auth
 router.post('/register', authLimiter, asyncHandler(register))
 router.post('/login', loginLimiter, asyncHandler(login))
+// Logout uses optionalAuthenticateToken so it works even if the token is
+// already expired or invalidated — the cookie is always cleared.
+router.post('/logout', optionalAuthenticateToken, asyncHandler(logout))
+router.post('/change-password', authenticateToken, sensitiveLimiter, asyncHandler(handleChangePassword))
 router.get('/me', authenticateToken, asyncHandler(me))
-router.post('/forgot-password', asyncHandler(forgotPassword))
-router.post('/reset-password/:token', asyncHandler(resetPassword))
 
-// Google OAuth (students only)
-router.post('/google', asyncHandler(handleGoogleAuth))
-router.post('/google/complete', asyncHandler(handleCompleteGoogleRegistration))
+// Password reset — rate-limited to prevent abuse & enumeration
+router.post('/forgot-password', sensitiveLimiter, asyncHandler(forgotPassword))
+router.post('/reset-password/:token', sensitiveLimiter, asyncHandler(resetPassword))
 
-// OTP verification
-router.post('/send-otp', asyncHandler(handleSendOtp))
-router.post('/verify-otp', asyncHandler(handleVerifyOtp))
+// Google OAuth (students only) — rate-limited
+router.post('/google', sensitiveLimiter, asyncHandler(handleGoogleAuth))
+router.post('/google/complete', sensitiveLimiter, asyncHandler(handleCompleteGoogleRegistration))
+
+// OTP verification — strictly rate-limited to prevent brute-force
+router.post('/send-otp', sensitiveLimiter, asyncHandler(handleSendOtp))
+router.post('/verify-otp', otpVerifyLimiter, asyncHandler(handleVerifyOtp))
 
 // Company approval (admin only)
 router.get('/pending-companies', authenticateToken, authorizeRoles('admin', 'tpo'), asyncHandler(handleGetPendingCompanies))

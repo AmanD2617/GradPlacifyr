@@ -96,23 +96,46 @@ router.put(
         throw new AppError('12th percentage must be between 0 and 100', 400, 'VALIDATION_ERROR')
       }
 
-      const projectsJson = JSON.stringify(projects || [])
+      // ═══════════ FIELD LENGTH LIMITS ═══════════
+      const truncate = (v, n) => (typeof v === 'string' ? v.slice(0, n) : v)
+      const MAX_TEXT  = 2000
+      const MAX_SHORT = 500
+
+      const safeLanguages       = truncate(programmingLanguages, MAX_SHORT)
+      const safeFrameworks      = truncate(frameworks, MAX_SHORT)
+      const safeTools           = truncate(tools, MAX_SHORT)
+      const safeCertifications  = truncate(certifications, MAX_SHORT)
+      const safeInternship      = truncate(internshipExperience, MAX_TEXT)
+      const safeAchievements    = truncate(achievements, MAX_TEXT)
+
+      // Limit projects array size and each project's fields
+      const safeProjects = Array.isArray(projects)
+        ? projects.slice(0, 20).map((p) =>
+            typeof p === 'object' && p !== null
+              ? Object.fromEntries(
+                  Object.entries(p).map(([k, v]) => [k, typeof v === 'string' ? v.slice(0, 500) : v])
+                )
+              : p
+          )
+        : []
+
+      const projectsJson = JSON.stringify(safeProjects)
 
       const data = {
         tenth_percentage: tenthPercentage ?? null,
         twelfth_percentage: twelfthPercentage ?? null,
         backlogs: backlogs ?? null,
         graduation_year: graduationYear ?? null,
-        programming_languages: programmingLanguages ?? null,
-        frameworks: frameworks ?? null,
-        tools: tools ?? null,
-        certifications: certifications ?? null,
+        programming_languages: safeLanguages ?? null,
+        frameworks: safeFrameworks ?? null,
+        tools: safeTools ?? null,
+        certifications: safeCertifications ?? null,
         projects_json: projectsJson,
-        internship_experience: internshipExperience ?? null,
-        achievements: achievements ?? null,
-        github_url: githubUrl ?? null,
-        linkedin_url: linkedinUrl ?? null,
-        portfolio_url: portfolioUrl ?? null,
+        internship_experience: safeInternship ?? null,
+        achievements: safeAchievements ?? null,
+        github_url: githubUrl ? String(githubUrl).slice(0, 255) : null,
+        linkedin_url: linkedinUrl ? String(linkedinUrl).slice(0, 255) : null,
+        portfolio_url: portfolioUrl ? String(portfolioUrl).slice(0, 255) : null,
       }
 
       const profile = await prisma.studentProfile.upsert({

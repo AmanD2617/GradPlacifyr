@@ -21,27 +21,31 @@ export interface UploadResumeResponse {
   originalName: string
 }
 
-function getHeaders(includeJson = false) {
-  const token = localStorage.getItem('placement_token')
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  if (includeJson) headers['Content-Type'] = 'application/json'
-  return headers
-}
+/** Shared fetch helper for multipart form data. */
+async function fetchForm<T>(url: string, init: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    credentials: 'include', // send HttpOnly cookie
+  })
 
-async function handleResponse<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}))
+
   if (!res.ok) {
     let message = 'Request failed'
     if (typeof data === 'string') {
       message = data
     } else if (data && typeof (data as any).error === 'string') {
       message = (data as any).error
-    } else if (data && typeof (data as any).error === 'object' && typeof (data as any).error.message === 'string') {
+    } else if (
+      data &&
+      typeof (data as any).error === 'object' &&
+      typeof (data as any).error.message === 'string'
+    ) {
       message = (data as any).error.message
     }
     throw new Error(message)
   }
+
   return data as T
 }
 
@@ -50,30 +54,23 @@ export async function uploadResume(file: File): Promise<UploadResumeResponse> {
   const formData = new FormData()
   formData.append('resume', file)
 
-  const res = await fetch(`${API_BASE}/student/upload-resume`, {
+  return fetchForm<UploadResumeResponse>(`${API_BASE}/student/upload-resume`, {
     method: 'POST',
-    headers: getHeaders(),
     body: formData,
   })
-
-  return handleResponse<UploadResumeResponse>(res)
 }
 
 /** Get current resume info */
 export async function getMyResume(): Promise<ResumeInfo> {
-  const res = await fetch(`${API_BASE}/student/my-resume`, {
-    headers: getHeaders(),
-  })
-  return handleResponse<ResumeInfo>(res)
+  return fetchForm<ResumeInfo>(`${API_BASE}/student/my-resume`, { method: 'GET' })
 }
 
 /** Delete stored resume */
 export async function deleteMyResume(): Promise<{ message: string }> {
-  const res = await fetch(`${API_BASE}/student/my-resume`, {
+  return fetchForm<{ message: string }>(`${API_BASE}/student/my-resume`, {
     method: 'DELETE',
-    headers: getHeaders(true),
+    headers: { 'Content-Type': 'application/json' },
   })
-  return handleResponse<{ message: string }>(res)
 }
 
 /** Send resume to AI for parsing (in-memory, no storage) */
@@ -81,11 +78,8 @@ export async function parseResume(file: File): Promise<ParsedResumeProfile> {
   const formData = new FormData()
   formData.append('resume', file)
 
-  const res = await fetch(`${API_BASE}/student/parse-resume`, {
+  return fetchForm<ParsedResumeProfile>(`${API_BASE}/student/parse-resume`, {
     method: 'POST',
-    headers: getHeaders(),
     body: formData,
   })
-
-  return handleResponse<ParsedResumeProfile>(res)
 }

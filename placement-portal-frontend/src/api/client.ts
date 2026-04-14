@@ -1,12 +1,21 @@
 import { API_BASE } from '../config'
 
+/**
+ * Central fetch wrapper.
+ *
+ * Auth is now handled via HttpOnly cookie (set by the backend on login).
+ * credentials: 'include' ensures the browser sends the cookie on every
+ * cross-origin request to the API server.
+ *
+ * The Authorization header fallback has been removed — tokens must not
+ * be stored in localStorage (XSS-accessible storage).
+ */
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('placement_token')
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
+    credentials: 'include', // send HttpOnly cookie automatically
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options?.headers ?? {}),
     },
   })

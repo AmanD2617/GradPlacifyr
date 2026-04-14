@@ -5,11 +5,16 @@ import { AppError } from '../utils/appError.js'
 
 const router = Router()
 
-// GET /api/events — list all events (any authenticated user)
+// GET /api/events — any authenticated user
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
+    const page  = Math.max(1, parseInt(req.query.page  ?? '1',   10) || 1)
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit ?? '100', 10) || 100))
+
     const events = await prisma.event.findMany({
       orderBy: { date: 'asc' },
+      take: limit,
+      skip: (page - 1) * limit,
       include: {
         creator: {
           select: { id: true, name: true, email: true, role: true },
@@ -36,7 +41,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
   }
 })
 
-// POST /api/events — create event (admin / company only)
+// POST /api/events — admin / company / tpo
 router.post(
   '/',
   authenticateToken,
@@ -51,12 +56,12 @@ router.post(
 
       const event = await prisma.event.create({
         data: {
-          title,
-          description: description || null,
-          date: new Date(date),
-          time: time || null,
-          company: company || null,
-          created_by: req.user.id,
+          title:       String(title).slice(0, 255),
+          description: description ? String(description).slice(0, 2000) : null,
+          date:        new Date(date),
+          time:        time    ? String(time).slice(0, 10) : null,
+          company:     company ? String(company).slice(0, 255) : null,
+          created_by:  req.user.id,
         },
       })
 
@@ -75,7 +80,7 @@ router.post(
   }
 )
 
-// PUT /api/events/:id — update event (admin / company only)
+// PUT /api/events/:id — admin / tpo can edit any; company can only edit their own
 router.put(
   '/:id',
   authenticateToken,
@@ -90,14 +95,20 @@ router.put(
         throw new AppError('Event not found', 404, 'NOT_FOUND')
       }
 
+      // ═══════════ OWNERSHIP CHECK ═══════════
+      // Company users can only edit events they created
+      if (req.user.role === 'company' && existing.created_by !== req.user.id) {
+        throw new AppError('You can only edit events you created', 403, 'FORBIDDEN')
+      }
+
       const updated = await prisma.event.update({
         where: { id },
         data: {
-          ...(title !== undefined && { title }),
-          ...(description !== undefined && { description }),
-          ...(date !== undefined && { date: new Date(date) }),
-          ...(time !== undefined && { time }),
-          ...(company !== undefined && { company }),
+          ...(title !== undefined       && { title:       String(title).slice(0, 255) }),
+          ...(description !== undefined && { description: description ? String(description).slice(0, 2000) : null }),
+          ...(date !== undefined        && { date:        new Date(date) }),
+          ...(time !== undefined        && { time:        time ? String(time).slice(0, 10) : null }),
+          ...(company !== undefined     && { company:     company ? String(company).slice(0, 255) : null }),
         },
       })
 
@@ -116,7 +127,7 @@ router.put(
   }
 )
 
-// DELETE /api/events/:id — delete event (admin / company only)
+// DELETE /api/events/:id — admin / tpo can delete any; company can only delete their own
 router.delete(
   '/:id',
   authenticateToken,
@@ -128,6 +139,11 @@ router.delete(
       const existing = await prisma.event.findUnique({ where: { id } })
       if (!existing) {
         throw new AppError('Event not found', 404, 'NOT_FOUND')
+      }
+
+      // ═══════════ OWNERSHIP CHECK ═══════════
+      if (req.user.role === 'company' && existing.created_by !== req.user.id) {
+        throw new AppError('You can only delete events you created', 403, 'FORBIDDEN')
       }
 
       await prisma.event.delete({ where: { id } })

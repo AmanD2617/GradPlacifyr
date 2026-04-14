@@ -121,7 +121,8 @@ export function errorHandler(err, req, res, next) {
     }))
   }
 
-  if (process.env.NODE_ENV !== 'production') {
+  // Only expose stack traces in explicit development mode
+  if (process.env.NODE_ENV === 'development') {
     response.error.stack = err.stack
   }
 
