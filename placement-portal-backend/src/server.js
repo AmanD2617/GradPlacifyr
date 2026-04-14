@@ -17,6 +17,7 @@ import uploadRoutes from './routes/upload.js'
 import roundsRoutes from './routes/rounds.js'
 import companyProfileRoutes from './routes/companyProfile.js'
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js'
+import { seedAdmin } from './services/authService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -55,6 +56,11 @@ app.get('/api/health', (req, res) => {
 app.use(notFoundHandler)
 app.use(errorHandler)
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server running at http://localhost:${PORT}`)
+  try {
+    await seedAdmin()
+  } catch (err) {
+    console.error('[seed] Failed to seed admin account:', err.message)
+  }
 })

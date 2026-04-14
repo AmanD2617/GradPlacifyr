@@ -35,6 +35,7 @@ const navByRole: Record<Role, NavItem[]> = {
     { label: 'Admin Dashboard', to: '/admin/dashboard' },
     { label: 'Manage Students', to: '/admin/manage-students' },
     { label: 'Manage Companies', to: '/admin/manage-companies' },
+    { label: 'Manage TPO', to: '/admin/manage-tpo' },
     { label: 'Approve JNF / TNF', to: '/admin/approve-jobs' },
     { label: 'Monitor Applications', to: '/admin/monitor-applications' },
     { label: 'Placement Reports', to: '/admin/reports' },

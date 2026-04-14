@@ -64,6 +64,11 @@ function toDbRole(appRole) {
 // ═══════════ REGISTRATION ═══════════
 
 export async function registerUser({ email, password, role, name, phone, enrollmentNumber }) {
+  // Admin and TPO accounts cannot be registered through public signup
+  if (role === 'admin' || role === 'tpo' || role === 'hod') {
+    throw new AppError('Registration is not available for this role', 403, 'FORBIDDEN')
+  }
+
   // Strict server-side validation
   const validationError = validateRegistration({ email, password, role, name, phone, enrollmentNumber })
   if (validationError) {
@@ -549,4 +554,37 @@ export async function resetPasswordWithToken(rawToken, newPassword) {
   })
 
   return { message: 'Password reset successful' }
+}
+
+// ═══════════ ADMIN SEED ═══════════
+// Ensures the single hardcoded admin account exists on every server start.
+export async function seedAdmin() {
+  const ADMIN_EMAIL = 'admin@jimsipu.org'
+  const ADMIN_PASSWORD = 'jims@rohini110'
+
+  const existing = await prisma.user.findUnique({
+    where: { email: ADMIN_EMAIL },
+    select: { id: true, role: true },
+  })
+
+  if (existing) {
+    // If the row exists but isn't admin, promote it (handles edge-cases)
+    if (existing.role !== 'admin') {
+      await prisma.user.update({ where: { id: existing.id }, data: { role: 'admin' } })
+    }
+    return
+  }
+
+  const hash = await bcrypt.hash(ADMIN_PASSWORD, 12)
+  await prisma.user.create({
+    data: {
+      email: ADMIN_EMAIL,
+      password_hash: hash,
+      role: 'admin',
+      name: 'Admin',
+      phone: '0000000000',
+      status: 'active',
+    },
+  })
+  console.log('[seed] Admin account created: admin@jimsipu.org')
 }
