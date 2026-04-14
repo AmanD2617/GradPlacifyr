@@ -34,6 +34,13 @@ router.post(
         )
       }
 
+      if (linkedInUrl && String(linkedInUrl).length > 500) {
+        throw new AppError('LinkedIn URL is too long', 400, 'VALIDATION_ERROR')
+      }
+      if (profileText && String(profileText).length > 5000) {
+        throw new AppError('Profile text must be under 5000 characters', 400, 'VALIDATION_ERROR')
+      }
+
       const userContextParts = []
       if (linkedInUrl) userContextParts.push(`LinkedIn: ${linkedInUrl}`)
       if (profileText) userContextParts.push(`Profile:\n${profileText}`)
@@ -95,6 +102,13 @@ router.post(
           400,
           'VALIDATION_ERROR'
         )
+      }
+
+      if (String(role).length > 100) {
+        throw new AppError('Role field must be under 100 characters', 400, 'VALIDATION_ERROR')
+      }
+      if (String(skills).length > 500) {
+        throw new AppError('Skills field must be under 500 characters', 400, 'VALIDATION_ERROR')
       }
 
       const completion = await openai.chat.completions.create({

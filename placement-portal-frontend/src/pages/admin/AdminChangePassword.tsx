@@ -1,3 +1,4 @@
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import '../shared/WorkPages.css'
 
 const AdminChangePassword = () => {
@@ -11,15 +12,15 @@ const AdminChangePassword = () => {
         <form className="work-form">
           <label>
             Current Password
-            <input type="password" />
+            <PasswordInput />
           </label>
           <label>
             New Password
-            <input type="password" />
+            <PasswordInput />
           </label>
           <label>
             Confirm New Password
-            <input type="password" />
+            <PasswordInput />
           </label>
           <button className="work-btn" type="button">
             Save Password

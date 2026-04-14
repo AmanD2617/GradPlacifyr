@@ -95,6 +95,12 @@ router.put(
       if (twelfthPercentage !== undefined && (twelfthPercentage < 0 || twelfthPercentage > 100)) {
         throw new AppError('12th percentage must be between 0 and 100', 400, 'VALIDATION_ERROR')
       }
+      if (programmingLanguages && String(programmingLanguages).length > 500) throw new AppError('Programming languages field must be under 500 characters', 400, 'VALIDATION_ERROR')
+      if (frameworks && String(frameworks).length > 500) throw new AppError('Frameworks field must be under 500 characters', 400, 'VALIDATION_ERROR')
+      if (tools && String(tools).length > 500) throw new AppError('Tools field must be under 500 characters', 400, 'VALIDATION_ERROR')
+      if (certifications && String(certifications).length > 500) throw new AppError('Certifications field must be under 500 characters', 400, 'VALIDATION_ERROR')
+      if (internshipExperience && String(internshipExperience).length > 2000) throw new AppError('Internship experience must be under 2000 characters', 400, 'VALIDATION_ERROR')
+      if (achievements && String(achievements).length > 2000) throw new AppError('Achievements must be under 2000 characters', 400, 'VALIDATION_ERROR')
 
       const projectsJson = JSON.stringify(projects || [])
 

@@ -77,6 +77,9 @@ router.post('/', authenticateToken, authorizeRoles('admin', 'company'), async (r
     if (!title || !company) {
       throw new AppError('Title and company required', 400, 'VALIDATION_ERROR')
     }
+    if (String(title).trim().length > 255) throw new AppError('Title must be under 255 characters', 400, 'VALIDATION_ERROR')
+    if (description && String(description).length > 10000) throw new AppError('Description must be under 10000 characters', 400, 'VALIDATION_ERROR')
+    if (requirements && String(requirements).length > 5000) throw new AppError('Requirements must be under 5000 characters', 400, 'VALIDATION_ERROR')
 
     const safeCompany =
       req.user.role === 'company'
@@ -109,6 +112,10 @@ router.put('/:id', authenticateToken, authorizeRoles('admin', 'company'), async 
     let { title, company, ctc, location, description, requirements, status } = req.body
     const id = Number(req.params.id)
     let where = { id }
+
+    if (title && String(title).trim().length > 255) throw new AppError('Title must be under 255 characters', 400, 'VALIDATION_ERROR')
+    if (description && String(description).length > 10000) throw new AppError('Description must be under 10000 characters', 400, 'VALIDATION_ERROR')
+    if (requirements && String(requirements).length > 5000) throw new AppError('Requirements must be under 5000 characters', 400, 'VALIDATION_ERROR')
 
     if (req.user.role === 'company') {
       const scope = await buildCompanyJobScope('jobs', req.user.id)

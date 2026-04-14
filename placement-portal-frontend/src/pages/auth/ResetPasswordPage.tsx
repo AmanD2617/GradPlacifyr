@@ -1,11 +1,19 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { resetPassword as resetPasswordApi } from '../../api/auth'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import './Auth.css'
+
+const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_\-+=])[A-Za-z\d@$!%*?&#^()_\-+=]{8,}$/
 
 const ResetPasswordPage = () => {
   const { token = '' } = useParams()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    // Remove the token from browser history so it isn't retained in the URL bar
+    window.history.replaceState(null, '', '/reset-password')
+  }, [])
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,6 +27,11 @@ const ResetPasswordPage = () => {
 
     if (!password.trim()) {
       setError('Please enter a new password')
+      return
+    }
+
+    if (!STRONG_PASSWORD_REGEX.test(password)) {
+      setError('Password must be at least 8 characters with uppercase, lowercase, number, and special character')
       return
     }
 
@@ -49,9 +62,9 @@ const ResetPasswordPage = () => {
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="auth-label">
             New Password
-            <input
-              type="password"
+            <PasswordInput
               className="auth-input"
+              placeholder="Min 8 chars, Aa1@"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -60,9 +73,9 @@ const ResetPasswordPage = () => {
 
           <label className="auth-label">
             Confirm Password
-            <input
-              type="password"
+            <PasswordInput
               className="auth-input"
+              placeholder="Re-enter new password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required

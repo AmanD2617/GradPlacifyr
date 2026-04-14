@@ -1,3 +1,4 @@
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import './StudentProfile.css'
 
 const StudentChangePassword = () => {
@@ -9,15 +10,15 @@ const StudentChangePassword = () => {
         <form className="password-form">
           <label>
             Current Password
-            <input type="password" />
+            <PasswordInput />
           </label>
           <label>
             New Password
-            <input type="password" />
+            <PasswordInput />
           </label>
           <label>
             Confirm New Password
-            <input type="password" />
+            <PasswordInput />
           </label>
           <button type="button">Save Password</button>
         </form>

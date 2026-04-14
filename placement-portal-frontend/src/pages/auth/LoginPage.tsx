@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, type Role } from '../../context/AuthContext'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import './Auth.css'
 
 const LoginPage = () => {
@@ -48,8 +49,7 @@ const LoginPage = () => {
 
           <label className="auth-label">
             Password
-            <input
-              type="password"
+            <PasswordInput
               className="auth-input"
               placeholder="********"
               value={password}

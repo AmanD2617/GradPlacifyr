@@ -88,6 +88,11 @@ router.put(
         location,
       } = req.body ?? {}
 
+      if (name && String(name).trim().length > 255) throw new AppError('Name must be under 255 characters', 400, 'VALIDATION_ERROR')
+      if (companyName && String(companyName).trim().length > 255) throw new AppError('Company name must be under 255 characters', 400, 'VALIDATION_ERROR')
+      if (about && String(about).trim().length > 2000) throw new AppError('About must be under 2000 characters', 400, 'VALIDATION_ERROR')
+      if (website && String(website).trim().length > 500) throw new AppError('Website must be under 500 characters', 400, 'VALIDATION_ERROR')
+
       // Update user-level fields
       const userUpdate = {}
       if (name !== undefined) userUpdate.name = String(name).trim() || null

@@ -98,8 +98,8 @@ router.post(
       })
 
       if (existingProfile?.resume_url) {
-        const oldPath = path.join(__dirname, '..', '..', existingProfile.resume_url)
-        if (fs.existsSync(oldPath)) {
+        const oldPath = path.resolve(__dirname, '..', '..', existingProfile.resume_url)
+        if (oldPath.startsWith(resumeUploadsDir) && fs.existsSync(oldPath)) {
           fs.unlinkSync(oldPath)
         }
       }
@@ -170,8 +170,8 @@ router.delete(
       })
 
       if (profile?.resume_url) {
-        const filePath = path.join(__dirname, '..', '..', profile.resume_url)
-        if (fs.existsSync(filePath)) {
+        const filePath = path.resolve(__dirname, '..', '..', profile.resume_url)
+        if (filePath.startsWith(resumeUploadsDir) && fs.existsSync(filePath)) {
           fs.unlinkSync(filePath)
         }
 

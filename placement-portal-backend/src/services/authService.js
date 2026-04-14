@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 import nodemailer from 'nodemailer'
 import prisma from '../db/prisma.js'
 import { AppError } from '../utils/appError.js'
-import { validateRegistration } from '../utils/validators.js'
+import { validateRegistration, STRONG_PASSWORD_REGEX } from '../utils/validators.js'
 
 const JWT_SECRET = process.env.JWT_SECRET
 if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required')
@@ -245,7 +245,7 @@ export async function googleAuth({ googleId, email, name }) {
 export async function completeGoogleRegistration({ googleId, email, name, phone }) {
   // Create new student account with Google
   const randomPassword = crypto.randomBytes(32).toString('hex')
-  const hash = await bcrypt.hash(randomPassword, 10)
+  const hash = await bcrypt.hash(randomPassword, 12)
 
   const created = await prisma.user.create({
     data: {
@@ -456,7 +456,8 @@ export async function createPasswordResetRequest(email) {
   })
 
   if (!user) {
-    throw new AppError('No account found for this email', 404, 'EMAIL_NOT_FOUND')
+    // Return generic message to prevent user enumeration
+    return { message: 'If an account exists for this email, a reset link has been sent' }
   }
 
   const rawToken = createRawResetToken()
@@ -504,6 +505,14 @@ export async function resetPasswordWithToken(rawToken, newPassword) {
     throw new AppError('New password is required', 400, 'VALIDATION_ERROR')
   }
 
+  if (!STRONG_PASSWORD_REGEX.test(newPassword)) {
+    throw new AppError(
+      'Password must be at least 8 characters with uppercase, lowercase, number, and special character',
+      400,
+      'WEAK_PASSWORD'
+    )
+  }
+
   const hashedToken = hashResetToken(rawToken)
 
   const user = await prisma.user.findFirst({
@@ -528,7 +537,7 @@ export async function resetPasswordWithToken(rawToken, newPassword) {
     throw new AppError('Password reset token has expired', 400, 'RESET_TOKEN_EXPIRED')
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 10)
+  const passwordHash = await bcrypt.hash(newPassword, 12)
 
   await prisma.user.update({
     where: { id: user.id },
