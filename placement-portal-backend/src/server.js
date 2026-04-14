@@ -1,6 +1,8 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import cookieParser from 'cookie-parser'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
@@ -22,7 +24,13 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3000
 
-app.use(cors({ origin: 'http://localhost:5173' }))
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',')
+  : ['http://localhost:5173']
+
+app.use(helmet())
+app.use(cors({ origin: allowedOrigins, credentials: true }))
+app.use(cookieParser())
 app.use(express.json())
 
 // Serve uploaded files statically

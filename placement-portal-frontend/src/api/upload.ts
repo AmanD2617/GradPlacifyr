@@ -13,15 +13,12 @@ export interface UploadAvatarResponse {
 }
 
 export async function uploadAvatar(file: File): Promise<UploadAvatarResponse> {
-  const token = localStorage.getItem('placement_token')
   const formData = new FormData()
   formData.append('avatar', file)
 
   const res = await fetch(`${API_BASE}/upload/avatar`, {
     method: 'POST',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    credentials: 'include',
     body: formData,
   })
 
@@ -39,13 +36,11 @@ export async function uploadAvatar(file: File): Promise<UploadAvatarResponse> {
 }
 
 export async function deleteAvatar(): Promise<{ message: string }> {
-  const token = localStorage.getItem('placement_token')
-
   const res = await fetch(`${API_BASE}/upload/avatar`, {
     method: 'DELETE',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   })
 

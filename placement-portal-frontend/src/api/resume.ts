@@ -22,9 +22,7 @@ export interface UploadResumeResponse {
 }
 
 function getHeaders(includeJson = false) {
-  const token = localStorage.getItem('placement_token')
   const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
   if (includeJson) headers['Content-Type'] = 'application/json'
   return headers
 }
@@ -52,6 +50,7 @@ export async function uploadResume(file: File): Promise<UploadResumeResponse> {
 
   const res = await fetch(`${API_BASE}/student/upload-resume`, {
     method: 'POST',
+    credentials: 'include',
     headers: getHeaders(),
     body: formData,
   })
@@ -62,6 +61,7 @@ export async function uploadResume(file: File): Promise<UploadResumeResponse> {
 /** Get current resume info */
 export async function getMyResume(): Promise<ResumeInfo> {
   const res = await fetch(`${API_BASE}/student/my-resume`, {
+    credentials: 'include',
     headers: getHeaders(),
   })
   return handleResponse<ResumeInfo>(res)
@@ -71,6 +71,7 @@ export async function getMyResume(): Promise<ResumeInfo> {
 export async function deleteMyResume(): Promise<{ message: string }> {
   const res = await fetch(`${API_BASE}/student/my-resume`, {
     method: 'DELETE',
+    credentials: 'include',
     headers: getHeaders(true),
   })
   return handleResponse<{ message: string }>(res)
@@ -83,6 +84,7 @@ export async function parseResume(file: File): Promise<ParsedResumeProfile> {
 
   const res = await fetch(`${API_BASE}/student/parse-resume`, {
     method: 'POST',
+    credentials: 'include',
     headers: getHeaders(),
     body: formData,
   })

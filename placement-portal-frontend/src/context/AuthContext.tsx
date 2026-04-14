@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login as apiLogin, type User as ApiUser, type Role } from '../api/auth'
+import { apiFetch } from '../api/client'
 
 export type { Role }
 
@@ -41,6 +42,7 @@ function toUser(u: ApiUser): User {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Initialize from cached user metadata for fast display (non-sensitive — no token stored)
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem('placement_user')
     return stored ? JSON.parse(stored) : null
@@ -48,24 +50,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const navigate = useNavigate()
 
+  // On mount, verify the session cookie is still valid via /api/auth/me
+  useEffect(() => {
+    apiFetch<ApiUser>('/auth/me')
+      .then((apiUser) => {
+        const u = toUser(apiUser)
+        setUser(u)
+        localStorage.setItem('placement_user', JSON.stringify(u))
+      })
+      .catch(() => {
+        // Cookie expired or absent — clear stale user cache
+        setUser(null)
+        localStorage.removeItem('placement_user')
+      })
+  }, [])
+
   const login = useCallback(
     async (email: string, password: string, selectedRole: Role): Promise<void> => {
       const res = await apiLogin(email, password, selectedRole)
       const u = toUser(res.user)
       setUser(u)
+      // Store only non-sensitive user metadata for fast display on next load
       localStorage.setItem('placement_user', JSON.stringify(u))
-      localStorage.setItem('placement_token', res.token)
-      // Signal login success for the toast system (decoupled via CustomEvent)
+      // Token is now in an httpOnly cookie set by the server — NOT stored in localStorage
       window.dispatchEvent(new CustomEvent('placement:login', { detail: { role: u.role } }))
       navigate(routes[u.role], { replace: true })
     },
     [navigate]
   )
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // Ask the server to clear the httpOnly cookie
+    await apiFetch('/auth/logout', { method: 'POST' }).catch(() => {})
     setUser(null)
     localStorage.removeItem('placement_user')
-    localStorage.removeItem('placement_token')
     navigate('/', { replace: true })
   }, [navigate])
 

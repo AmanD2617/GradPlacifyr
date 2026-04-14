@@ -6,7 +6,8 @@ import prisma from '../db/prisma.js'
 import { AppError } from '../utils/appError.js'
 import { validateRegistration } from '../utils/validators.js'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required')
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000
 const OTP_TTL_MS = 10 * 60 * 1000 // 10 minutes
 
@@ -271,7 +272,7 @@ export async function completeGoogleRegistration({ googleId, email, name, phone 
 // ═══════════ OTP SYSTEM ═══════════
 
 function generateOtpCode() {
-  return String(Math.floor(100000 + Math.random() * 900000))
+  return String(crypto.randomInt(100000, 1000000))
 }
 
 export async function sendOtp(email) {

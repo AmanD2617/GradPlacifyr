@@ -1,22 +1,16 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth, type Role } from '../../context/AuthContext'
 import './Auth.css'
 
 const LoginPage = () => {
-  const [searchParams] = useSearchParams()
-  const roleFromQuery = searchParams.get('role')
   const { login } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [role, setRole] = useState<Role>(
-    roleFromQuery === 'student' || roleFromQuery === 'admin' || roleFromQuery === 'recruiter' || roleFromQuery === 'tpo'
-      ? roleFromQuery
-      : 'student'
-  )
+  const [role, setRole] = useState<Role>('student')
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()

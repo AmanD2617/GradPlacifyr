@@ -14,16 +14,38 @@ import {
   rejectCompany,
 } from '../services/authService.js'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required')
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+}
+
+function setAuthCookie(res, token) {
+  res.cookie('placement_token', token, COOKIE_OPTIONS)
+}
 
 export async function register(req, res) {
   const result = await registerUser(req.body)
+  if (result.token) {
+    setAuthCookie(res, result.token)
+  }
   res.status(201).json(result)
 }
 
 export async function login(req, res) {
   const result = await loginUser(req.body)
+  setAuthCookie(res, result.token)
   res.json(result)
+}
+
+export async function logout(_req, res) {
+  res.clearCookie('placement_token', { path: '/' })
+  res.json({ ok: true })
 }
 
 export async function me(req, res) {
@@ -91,6 +113,7 @@ export async function handleGoogleAuth(req, res) {
 
   if (result.exists) {
     const token = jwt.sign({ id: result.user.id, role: result.user.role }, JWT_SECRET, { expiresIn: '7d' })
+    setAuthCookie(res, token)
     return res.json({ exists: true, token, user: result.user })
   }
 
@@ -101,6 +124,9 @@ export async function handleGoogleAuth(req, res) {
 export async function handleCompleteGoogleRegistration(req, res) {
   const { googleId, email, name, phone } = req.body ?? {}
   const result = await completeGoogleRegistration({ googleId, email, name, phone })
+  if (result.token) {
+    setAuthCookie(res, result.token)
+  }
   res.status(201).json(result)
 }
 

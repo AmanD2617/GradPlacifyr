@@ -90,6 +90,10 @@ router.put(
         throw new AppError('Event not found', 404, 'NOT_FOUND')
       }
 
+      if (existing.created_by !== req.user.id && req.user.role !== 'admin') {
+        throw new AppError('Forbidden', 403, 'FORBIDDEN')
+      }
+
       const updated = await prisma.event.update({
         where: { id },
         data: {
@@ -128,6 +132,10 @@ router.delete(
       const existing = await prisma.event.findUnique({ where: { id } })
       if (!existing) {
         throw new AppError('Event not found', 404, 'NOT_FOUND')
+      }
+
+      if (existing.created_by !== req.user.id && req.user.role !== 'admin') {
+        throw new AppError('Forbidden', 403, 'FORBIDDEN')
       }
 
       await prisma.event.delete({ where: { id } })

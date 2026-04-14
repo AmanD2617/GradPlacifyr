@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken'
 import { AppError } from '../utils/appError.js'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required')
 
 const ROLE_ALIASES = {
   student: 'student',
@@ -20,9 +21,9 @@ function normalizeRole(role) {
 export function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization
   const token =
-    authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.slice(7)
-      : null
+    (authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null)
+    || req.cookies?.placement_token
+    || null
 
   if (!token) {
     return next(new AppError('Authentication required', 401, 'AUTH_REQUIRED'))
@@ -45,9 +46,9 @@ export function authenticateToken(req, res, next) {
 export function optionalAuthenticateToken(req, res, next) {
   const authHeader = req.headers.authorization
   const token =
-    authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.slice(7)
-      : null
+    (authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null)
+    || req.cookies?.placement_token
+    || null
 
   if (!token) {
     req.user = null

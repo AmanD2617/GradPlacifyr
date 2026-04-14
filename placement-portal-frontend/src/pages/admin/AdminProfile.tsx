@@ -110,13 +110,12 @@ const AdminProfile = () => {
     setError(null)
 
     try {
-      const token = localStorage.getItem('placement_token')
       const formData = new FormData()
       formData.append('avatar', file)
 
       const res = await fetch(`${API_BASE}/upload/avatar`, {
         method: 'POST',
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        credentials: 'include',
         body: formData,
       })
 
