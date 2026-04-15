@@ -123,9 +123,4 @@ app.use(errorHandler)
 
 app.listen(PORT, async () => {
   console.log(`Server running at http://localhost:${PORT}`)
-  try {
-    await seedAdmin()
-  } catch (err) {
-    console.error('[seed] Failed to seed admin account:', err.message)
-  }
 })

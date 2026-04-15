@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login as apiLogin, logout as apiLogout, type User as ApiUser, type Role } from '../api/auth'
+import { apiFetch } from '../api/client'
 
 export type { Role }
 
