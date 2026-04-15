@@ -121,6 +121,8 @@ router.get(
   async (req, res, next) => {
     try {
       const { jobId } = req.query
+      const page  = Math.max(1, parseInt(req.query.page  ?? '1',   10) || 1)
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit ?? '50', 10) || 50))
       const where = {}
 
       // Build the job-level filter for company scoping
@@ -136,6 +138,8 @@ router.get(
 
       const rows = await prisma.application.findMany({
         where,
+        take: limit,
+        skip: (page - 1) * limit,
         select: {
           id: true,
           job_id: true,

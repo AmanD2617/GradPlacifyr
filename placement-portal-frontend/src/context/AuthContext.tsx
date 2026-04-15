@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login as apiLogin, type User as ApiUser, type Role } from '../api/auth'
-import { apiFetch } from '../api/client'
+import { login as apiLogin, logout as apiLogout, type User as ApiUser, type Role } from '../api/auth'
 
 export type { Role }
 
@@ -44,6 +43,9 @@ function toUser(u: ApiUser): User {
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize from cached user metadata for fast display (non-sensitive — no token stored)
   const [user, setUser] = useState<User | null>(() => {
+    // Only non-sensitive user metadata (id, name, email, role) is kept in
+    // localStorage for UI state persistence. The JWT is stored exclusively
+    // in an HttpOnly cookie managed by the backend — never in localStorage.
     const stored = localStorage.getItem('placement_user')
     return stored ? JSON.parse(stored) : null
   })
@@ -70,9 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await apiLogin(email, password, selectedRole)
       const u = toUser(res.user)
       setUser(u)
-      // Store only non-sensitive user metadata for fast display on next load
+      // Store only non-sensitive display data — NOT the token
       localStorage.setItem('placement_user', JSON.stringify(u))
-      // Token is now in an httpOnly cookie set by the server — NOT stored in localStorage
+      // The HttpOnly cookie is set automatically by the backend's Set-Cookie header
       window.dispatchEvent(new CustomEvent('placement:login', { detail: { role: u.role } }))
       navigate(routes[u.role], { replace: true })
     },
@@ -80,8 +82,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(async () => {
-    // Ask the server to clear the httpOnly cookie
-    await apiFetch('/auth/logout', { method: 'POST' }).catch(() => {})
+    // Call backend logout to clear the HttpOnly cookie server-side
+    try {
+      await apiLogout()
+    } catch {
+      // Continue with client-side cleanup even if the request fails
+    }
     setUser(null)
     localStorage.removeItem('placement_user')
     navigate('/', { replace: true })

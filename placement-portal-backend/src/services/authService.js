@@ -5,11 +5,16 @@ import nodemailer from 'nodemailer'
 import prisma from '../db/prisma.js'
 import { AppError } from '../utils/appError.js'
 import { validateRegistration, STRONG_PASSWORD_REGEX } from '../utils/validators.js'
+import { JWT_SECRET } from '../middleware/auth.js'
 
-const JWT_SECRET = process.env.JWT_SECRET
-if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required')
+const BCRYPT_ROUNDS = 12
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000
-const OTP_TTL_MS = 10 * 60 * 1000 // 10 minutes
+const OTP_TTL_MS = 10 * 60 * 1000
+const OTP_MAX_ATTEMPTS = 5
+
+// Per-account login brute-force protection
+const LOGIN_MAX_FAILURES = 5          // Lock after 5 consecutive failures
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000 // Lock for 15 minutes
 
 let cachedTransporter
 
@@ -36,9 +41,20 @@ function getMailerTransport() {
   return cachedTransporter
 }
 
+/**
+ * Build JWT with token_version (tv) embedded so we can invalidate all
+ * tokens for a user by incrementing their token_version in the DB.
+ */
 function buildJwt(user) {
-  return jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' })
+  return jwt.sign(
+    { id: user.id, role: user.role, tv: user.token_version ?? 1 },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  )
 }
+
+/** Public alias used by the controller layer (e.g., Google OAuth flow). */
+export { buildJwt as buildJwtPublic }
 
 function buildUserPayload(user) {
   return {
@@ -53,9 +69,6 @@ function buildUserPayload(user) {
 }
 
 // ═══════════ ROLE MAPPING ═══════════
-// The DB enum uses 'hod' as the stored value for TPO users.
-// The auth middleware normalizes 'hod' → 'tpo' for the app layer.
-// When writing to DB, we must map 'tpo' back to 'hod'.
 const APP_TO_DB_ROLE = { tpo: 'hod' }
 function toDbRole(appRole) {
   return APP_TO_DB_ROLE[appRole] || appRole
@@ -64,12 +77,6 @@ function toDbRole(appRole) {
 // ═══════════ REGISTRATION ═══════════
 
 export async function registerUser({ email, password, role, name, phone, enrollmentNumber }) {
-  // Admin and TPO accounts cannot be registered through public signup
-  if (role === 'admin' || role === 'tpo' || role === 'hod') {
-    throw new AppError('Registration is not available for this role', 403, 'FORBIDDEN')
-  }
-
-  // Strict server-side validation
   const validationError = validateRegistration({ email, password, role, name, phone, enrollmentNumber })
   if (validationError) {
     throw new AppError(validationError, 400, 'VALIDATION_ERROR')
@@ -77,17 +84,13 @@ export async function registerUser({ email, password, role, name, phone, enrollm
 
   const normalizedEmail = email.trim().toLowerCase()
   const cleanPhone = phone.replace(/\D/g, '')
-
-  // Map app-level role to the DB enum value (e.g. 'tpo' → 'hod')
   const dbRole = toDbRole(role)
 
-  // Check for duplicate email
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } })
   if (existing) {
     throw new AppError('An account with this email already exists', 409, 'DUPLICATE_EMAIL')
   }
 
-  // Check for duplicate enrollment number (students)
   if (role === 'student' && enrollmentNumber) {
     const existingEnrollment = await prisma.user.findUnique({
       where: { enrollment_number: enrollmentNumber.trim().toUpperCase() },
@@ -98,10 +101,8 @@ export async function registerUser({ email, password, role, name, phone, enrollm
     }
   }
 
-  // Company/Recruiter accounts start as "pending" — need admin approval
   const status = role === 'recruiter' ? 'pending' : 'active'
-
-  const hash = await bcrypt.hash(password, 12)
+  const hash = await bcrypt.hash(password, BCRYPT_ROUNDS)
 
   const created = await prisma.user.create({
     data: {
@@ -113,10 +114,9 @@ export async function registerUser({ email, password, role, name, phone, enrollm
       enrollment_number: role === 'student' ? enrollmentNumber.trim().toUpperCase() : null,
       status,
     },
-    select: { id: true },
+    select: { id: true, token_version: true },
   })
 
-  // If pending, don't issue a token — tell the user to wait for approval
   if (status === 'pending') {
     return {
       pending: true,
@@ -132,6 +132,7 @@ export async function registerUser({ email, password, role, name, phone, enrollm
     profile_image: null,
     phone: cleanPhone,
     status,
+    token_version: created.token_version ?? 1,
   }
 
   return {
@@ -152,19 +153,44 @@ export async function loginUser({ email, password, role }) {
     select: {
       id: true, email: true, password_hash: true, role: true,
       name: true, profile_image: true, phone: true, status: true,
+      token_version: true, failed_login_attempts: true, locked_until: true,
     },
   })
 
   if (!user) {
+    // Still run a dummy bcrypt compare to prevent timing-based user enumeration
+    await bcrypt.compare(password, '$2a$12$invalidhashinvalidhashinvalidhashX')
     throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS')
+  }
+
+  // ═══════════ PER-ACCOUNT LOCKOUT ═══════════
+  if (user.locked_until && new Date(user.locked_until) > new Date()) {
+    const remaining = Math.ceil((new Date(user.locked_until) - Date.now()) / 60000)
+    throw new AppError(
+      `Account locked due to too many failed attempts. Try again in ${remaining} minute(s).`,
+      429,
+      'ACCOUNT_LOCKED'
+    )
   }
 
   const match = await bcrypt.compare(password, user.password_hash)
   if (!match) {
+    // Increment failed attempt counter; lock after threshold
+    const attempts = (user.failed_login_attempts ?? 0) + 1
+    const lockData = attempts >= LOGIN_MAX_FAILURES
+      ? { failed_login_attempts: attempts, locked_until: new Date(Date.now() + LOGIN_LOCKOUT_MS) }
+      : { failed_login_attempts: attempts }
+
+    await prisma.user.update({ where: { id: user.id }, data: lockData })
     throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS')
   }
 
-  // Check account status
+  // Successful login — reset failure counter and unlock
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { failed_login_attempts: 0, locked_until: null },
+  })
+
   if (user.status === 'pending') {
     throw new AppError(
       'Your account is pending admin approval. Please wait for activation.',
@@ -180,14 +206,11 @@ export async function loginUser({ email, password, role }) {
     )
   }
 
-  // Role validation
   if (role) {
     const normalizedSelected = role.toLowerCase()
     const dbRole = user.role.toLowerCase()
-
     const roleMatches =
       normalizedSelected === dbRole ||
-      // Legacy hod users can log in as tpo
       (normalizedSelected === 'tpo' && dbRole === 'hod') ||
       (normalizedSelected === 'hod' && dbRole === 'tpo')
 
@@ -213,17 +236,16 @@ export async function googleAuth({ googleId, email, name }) {
     throw new AppError('Google ID and email are required', 400, 'VALIDATION_ERROR')
   }
 
-  // Check if user exists by google_id or email
   let user = await prisma.user.findFirst({
     where: { OR: [{ google_id: googleId }, { email }] },
     select: {
       id: true, email: true, role: true, name: true,
       profile_image: true, phone: true, status: true, google_id: true,
+      token_version: true,  // Required for buildJwt() to embed the tv claim
     },
   })
 
   if (user) {
-    // Only students can use Google login
     if (user.role !== 'student') {
       throw new AppError(
         'Google login is only available for students. Please use email/password.',
@@ -232,7 +254,6 @@ export async function googleAuth({ googleId, email, name }) {
       )
     }
 
-    // Link Google ID if not already linked
     if (!user.google_id) {
       await prisma.user.update({
         where: { id: user.id },
@@ -240,17 +261,32 @@ export async function googleAuth({ googleId, email, name }) {
       })
     }
 
-    return { exists: true, user: buildUserPayload(user) }
+    // Return both the public-safe payload AND the raw DB row so the controller
+    // can call buildJwtPublic(rawUser) which needs token_version.
+    return { exists: true, user: buildUserPayload(user), rawUser: user }
   }
 
-  // User doesn't exist — we'll create after OTP verification
   return { exists: false, email, name, googleId }
 }
 
-export async function completeGoogleRegistration({ googleId, email, name, phone }) {
-  // Create new student account with Google
+export async function completeGoogleRegistration({ googleId, email, name, phone, verificationToken }) {
+  // ═══════════ OTP PROOF REQUIRED ═══════════
+  // The caller must supply a verification token issued by verifyOtp()
+  if (!verificationToken) {
+    throw new AppError('OTP verification is required before registration', 400, 'OTP_NOT_VERIFIED')
+  }
+
+  try {
+    const payload = jwt.verify(verificationToken, JWT_SECRET)
+    if (payload.purpose !== 'otp_verified' || payload.email !== email) {
+      throw new Error('mismatch')
+    }
+  } catch {
+    throw new AppError('Invalid or expired OTP verification token', 400, 'INVALID_VERIFICATION_TOKEN')
+  }
+
   const randomPassword = crypto.randomBytes(32).toString('hex')
-  const hash = await bcrypt.hash(randomPassword, 12)
+  const hash = await bcrypt.hash(randomPassword, BCRYPT_ROUNDS)
 
   const created = await prisma.user.create({
     data: {
@@ -264,7 +300,7 @@ export async function completeGoogleRegistration({ googleId, email, name, phone 
     },
     select: {
       id: true, email: true, role: true, name: true,
-      profile_image: true, phone: true, status: true,
+      profile_image: true, phone: true, status: true, token_version: true,
     },
   })
 
@@ -276,6 +312,10 @@ export async function completeGoogleRegistration({ googleId, email, name, phone 
 
 // ═══════════ OTP SYSTEM ═══════════
 
+/**
+ * Generate a cryptographically secure 6-digit OTP.
+ * Uses crypto.randomInt() instead of Math.random().
+ */
 function generateOtpCode() {
   return String(crypto.randomInt(100000, 1000000))
 }
@@ -294,7 +334,7 @@ export async function sendOtp(email) {
     data: { used: true },
   })
 
-  // Create new OTP
+  // Create new OTP (attempts start at 0)
   await prisma.otp.create({
     data: { email, code, expires_at: expiresAt },
   })
@@ -329,7 +369,6 @@ export async function verifyOtp(email, code) {
   const otp = await prisma.otp.findFirst({
     where: {
       email,
-      code,
       used: false,
       expires_at: { gt: new Date() },
     },
@@ -340,13 +379,45 @@ export async function verifyOtp(email, code) {
     throw new AppError('Invalid or expired OTP', 400, 'INVALID_OTP')
   }
 
+  // ═══════════ OTP BRUTE-FORCE PROTECTION ═══════════
+  const attempts = (otp.attempts ?? 0) + 1
+
+  if (otp.attempts >= OTP_MAX_ATTEMPTS) {
+    // Already at max — lock this OTP and force a new one
+    await prisma.otp.update({ where: { id: otp.id }, data: { used: true } })
+    throw new AppError('Too many failed OTP attempts. Please request a new code.', 429, 'OTP_MAX_ATTEMPTS')
+  }
+
+  // Constant-time comparison to prevent timing attacks
+  const isMatch = crypto.timingSafeEqual(
+    Buffer.from(code.padEnd(6, ' ')),
+    Buffer.from(otp.code.padEnd(6, ' '))
+  )
+
+  if (!isMatch) {
+    // Persist incremented attempt count; lock if threshold reached
+    if (attempts >= OTP_MAX_ATTEMPTS) {
+      await prisma.otp.update({ where: { id: otp.id }, data: { used: true, attempts } })
+      throw new AppError('Too many failed OTP attempts. Please request a new code.', 429, 'OTP_MAX_ATTEMPTS')
+    }
+    await prisma.otp.update({ where: { id: otp.id }, data: { attempts } })
+    throw new AppError('Invalid or expired OTP', 400, 'INVALID_OTP')
+  }
+
   // Mark as used
   await prisma.otp.update({
     where: { id: otp.id },
     data: { used: true },
   })
 
-  return { verified: true }
+  // Issue a short-lived verification token (proof that OTP was verified)
+  const verificationToken = jwt.sign(
+    { email, purpose: 'otp_verified' },
+    JWT_SECRET,
+    { expiresIn: '15m' }
+  )
+
+  return { verified: true, verificationToken }
 }
 
 // ═══════════ COMPANY APPROVAL (ADMIN) ═══════════
@@ -358,6 +429,7 @@ export async function getPendingCompanies() {
       id: true, name: true, email: true, phone: true, created_at: true,
     },
     orderBy: { created_at: 'desc' },
+    take: 200, // Reasonable ceiling — pending queue shouldn't exceed this
   })
 
   return users.map((u) => ({
@@ -450,10 +522,39 @@ async function sendResetEmail(toEmail, resetLink) {
   })
 }
 
+/** Send a notification that the password was changed (security alert) */
+async function sendPasswordChangedNotification(toEmail) {
+  try {
+    const transporter = getMailerTransport()
+    const from = process.env.SMTP_FROM || process.env.SMTP_USER
+
+    await transporter.sendMail({
+      from,
+      to: toEmail,
+      subject: 'Placement Portal - Your Password Was Changed',
+      text: 'Your password was recently changed. If you did not make this change, please contact support immediately.',
+      html: `
+        <div style="font-family:system-ui,sans-serif;padding:20px;">
+          <h2 style="color:#1f4b9c;">Placement Portal</h2>
+          <p>Your password was recently changed.</p>
+          <p style="color:#c0392b;font-weight:bold;">If you did not make this change, please contact support immediately.</p>
+        </div>
+      `,
+    })
+  } catch {
+    // Non-critical — don't fail the reset if notification fails
+    console.error('Failed to send password change notification email')
+  }
+}
+
 export async function createPasswordResetRequest(email) {
   if (!email) {
     throw new AppError('Email is required', 400, 'VALIDATION_ERROR')
   }
+
+  // ═══════════ PREVENT EMAIL ENUMERATION ═══════════
+  // Always return the same response regardless of whether the email exists.
+  const GENERIC_RESPONSE = { message: 'If that email is registered, you will receive a password reset link.' }
 
   const user = await prisma.user.findUnique({
     where: { email },
@@ -461,8 +562,8 @@ export async function createPasswordResetRequest(email) {
   })
 
   if (!user) {
-    // Return generic message to prevent user enumeration
-    return { message: 'If an account exists for this email, a reset link has been sent' }
+    // Return generic response — do NOT reveal that the email is unregistered
+    return GENERIC_RESPONSE
   }
 
   const rawToken = createRawResetToken()
@@ -477,7 +578,19 @@ export async function createPasswordResetRequest(email) {
     },
   })
 
-  const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '')
+  // ═══════════ VALIDATE FRONTEND_URL — PREVENT OPEN REDIRECT ═══════════
+  const rawFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+  let baseUrl
+  try {
+    const parsed = new URL(rawFrontendUrl)
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('Invalid protocol')
+    }
+    baseUrl = parsed.origin // strips trailing path, enforces origin only
+  } catch {
+    console.error('[authService] Invalid FRONTEND_URL in environment — falling back to localhost')
+    baseUrl = 'http://localhost:5173'
+  }
   const resetLink = `${baseUrl}/reset-password/${rawToken}`
 
   try {
@@ -498,7 +611,7 @@ export async function createPasswordResetRequest(email) {
     throw new AppError('Unable to send password reset email', 502, 'EMAIL_SEND_FAILED')
   }
 
-  return { message: 'Password reset email sent' }
+  return GENERIC_RESPONSE
 }
 
 export async function resetPasswordWithToken(rawToken, newPassword) {
@@ -510,6 +623,7 @@ export async function resetPasswordWithToken(rawToken, newPassword) {
     throw new AppError('New password is required', 400, 'VALIDATION_ERROR')
   }
 
+  // ═══════════ PASSWORD STRENGTH VALIDATION ON RESET ═══════════
   if (!STRONG_PASSWORD_REGEX.test(newPassword)) {
     throw new AppError(
       'Password must be at least 8 characters with uppercase, lowercase, number, and special character',
@@ -522,7 +636,7 @@ export async function resetPasswordWithToken(rawToken, newPassword) {
 
   const user = await prisma.user.findFirst({
     where: { reset_password_token: hashedToken },
-    select: { id: true, reset_password_expire: true },
+    select: { id: true, email: true, reset_password_expire: true },
   })
 
   if (!user) {
@@ -542,7 +656,7 @@ export async function resetPasswordWithToken(rawToken, newPassword) {
     throw new AppError('Password reset token has expired', 400, 'RESET_TOKEN_EXPIRED')
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 12)
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
   await prisma.user.update({
     where: { id: user.id },
@@ -550,41 +664,73 @@ export async function resetPasswordWithToken(rawToken, newPassword) {
       password_hash: passwordHash,
       reset_password_token: null,
       reset_password_expire: null,
+      token_version: { increment: 1 }, // Invalidate all existing sessions
+      failed_login_attempts: 0,        // Reset lockout state after password change
+      locked_until: null,
     },
   })
+
+  // ═══════════ SEND PASSWORD CHANGE NOTIFICATION ═══════════
+  await sendPasswordChangedNotification(user.email)
 
   return { message: 'Password reset successful' }
 }
 
-// ═══════════ ADMIN SEED ═══════════
-// Ensures the single hardcoded admin account exists on every server start.
-export async function seedAdmin() {
-  const ADMIN_EMAIL = 'admin@jimsipu.org'
-  const ADMIN_PASSWORD = 'jims@rohini110'
+// ═══════════ AUTHENTICATED PASSWORD CHANGE ═══════════
 
-  const existing = await prisma.user.findUnique({
-    where: { email: ADMIN_EMAIL },
-    select: { id: true, role: true },
-  })
-
-  if (existing) {
-    // If the row exists but isn't admin, promote it (handles edge-cases)
-    if (existing.role !== 'admin') {
-      await prisma.user.update({ where: { id: existing.id }, data: { role: 'admin' } })
-    }
-    return
+export async function changePassword(userId, { currentPassword, newPassword }) {
+  if (!currentPassword || !newPassword) {
+    throw new AppError('Current password and new password are required', 400, 'VALIDATION_ERROR')
   }
 
-  const hash = await bcrypt.hash(ADMIN_PASSWORD, 12)
-  await prisma.user.create({
+  if (!STRONG_PASSWORD_REGEX.test(newPassword)) {
+    throw new AppError(
+      'Password must be at least 8 characters with uppercase, lowercase, number, and special character',
+      400,
+      'WEAK_PASSWORD'
+    )
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, password_hash: true, google_id: true },
+  })
+
+  if (!user) {
+    throw new AppError('User not found', 404, 'USER_NOT_FOUND')
+  }
+
+  // Google-only accounts have a random password_hash — don't allow change via this flow
+  if (!user.password_hash) {
+    throw new AppError(
+      'Password change is not available for Google-linked accounts',
+      400,
+      'GOOGLE_ACCOUNT'
+    )
+  }
+
+  const match = await bcrypt.compare(currentPassword, user.password_hash)
+  if (!match) {
+    throw new AppError('Current password is incorrect', 401, 'INVALID_CREDENTIALS')
+  }
+
+  if (currentPassword === newPassword) {
+    throw new AppError('New password must be different from current password', 400, 'SAME_PASSWORD')
+  }
+
+  const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
+
+  await prisma.user.update({
+    where: { id: userId },
     data: {
-      email: ADMIN_EMAIL,
-      password_hash: hash,
-      role: 'admin',
-      name: 'Admin',
-      phone: '0000000000',
-      status: 'active',
+      password_hash: newHash,
+      token_version: { increment: 1 }, // Invalidate all other sessions
+      failed_login_attempts: 0,
+      locked_until: null,
     },
   })
-  console.log('[seed] Admin account created: admin@jimsipu.org')
+
+  await sendPasswordChangedNotification(user.email)
+
+  return { message: 'Password changed successfully' }
 }

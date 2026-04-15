@@ -1,58 +1,75 @@
 /**
- * Simple in-memory rate limiter middleware.
- * Limits requests per IP address within a sliding time window.
+ * Production-grade rate limiting via express-rate-limit.
  *
- * For production, replace with express-rate-limit + Redis store:
- *   npm install express-rate-limit rate-limit-redis
+ * Uses the built-in MemoryStore by default. For multi-process / production,
+ * swap in a Redis store:
+ *
+ *   import { RedisStore } from 'rate-limit-redis'
+ *   import { createClient } from 'redis'
+ *   const redisClient = createClient({ url: process.env.REDIS_URL })
+ *   await redisClient.connect()
+ *
+ * Then pass `store: new RedisStore({ sendCommand: (...args) => redisClient.sendCommand(args) })`
+ * to each limiter below.
  */
+import rateLimit from 'express-rate-limit'
 
-const requestCounts = new Map()
+/** General API rate limiter: 100 req / min per IP */
+export const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests, please try again later.' },
+  },
+})
 
-// Clean up expired entries every 5 minutes
-setInterval(() => {
-  const now = Date.now()
-  for (const [key, entry] of requestCounts) {
-    if (now - entry.windowStart > entry.windowMs) {
-      requestCounts.delete(key)
-    }
-  }
-}, 5 * 60 * 1000)
+/** Auth endpoints (register, etc.): 10 req / min per IP */
+export const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests, please try again later.' },
+  },
+})
 
-/**
- * Creates a rate limiter middleware.
- * @param {Object} options
- * @param {number} options.windowMs  - Time window in milliseconds (default: 60000 = 1 min)
- * @param {number} options.max       - Max requests per window (default: 10)
- * @param {string} options.message   - Error message when limit exceeded
- */
-export function rateLimit({ windowMs = 60 * 1000, max = 10, message = 'Too many requests, please try again later.' } = {}) {
-  return (req, res, next) => {
-    const key = req.ip || req.connection.remoteAddress || 'unknown'
-    const now = Date.now()
+/** Login: 5 req / min per IP */
+export const loginLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many login attempts. Please wait a minute and try again.' },
+  },
+})
 
-    let entry = requestCounts.get(key)
+/** Sensitive endpoints (OTP, password reset, Google auth): 5 req / 15 min per IP */
+export const sensitiveLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many attempts. Please try again in 15 minutes.' },
+  },
+})
 
-    if (!entry || now - entry.windowStart > windowMs) {
-      // Start a new window
-      entry = { windowStart: now, count: 1, windowMs }
-      requestCounts.set(key, entry)
-      return next()
-    }
-
-    entry.count++
-
-    if (entry.count > max) {
-      const retryAfterMs = windowMs - (now - entry.windowStart)
-      res.set('Retry-After', String(Math.ceil(retryAfterMs / 1000)))
-      return res.status(429).json({
-        success: false,
-        error: {
-          code: 'RATE_LIMIT_EXCEEDED',
-          message,
-        },
-      })
-    }
-
-    next()
-  }
-}
+/** OTP verification: 5 attempts / 15 min per IP — prevents brute-force */
+export const otpVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many OTP attempts. Please request a new code.' },
+  },
+})

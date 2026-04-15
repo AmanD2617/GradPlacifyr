@@ -28,6 +28,9 @@ const JOB_LIST_SELECT = {
 // GET /api/jobs - list all jobs
 router.get('/', authenticateToken, authorizeRoles('student', 'company', 'tpo', 'admin'), async (req, res, next) => {
   try {
+    const page  = Math.max(1, parseInt(req.query.page  ?? '1',    10) || 1)
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit ?? '100', 10) || 100))
+
     let where = {}
 
     if (req.user?.role === 'company') {
@@ -39,6 +42,8 @@ router.get('/', authenticateToken, authorizeRoles('student', 'company', 'tpo', '
       where,
       select: JOB_LIST_SELECT,
       orderBy: { created_at: 'desc' },
+      take: limit,
+      skip: (page - 1) * limit,
     })
 
     res.json(jobs)
@@ -88,12 +93,12 @@ router.post('/', authenticateToken, authorizeRoles('admin', 'company'), async (r
 
     const job = await prisma.job.create({
       data: {
-        title,
-        company: safeCompany,
-        ctc: ctc || null,
-        location: location || null,
-        description: description || null,
-        requirements: requirements || null,
+        title:        String(title).slice(0, 255),
+        company:      String(safeCompany).slice(0, 255),
+        ctc:          ctc      ? String(ctc).slice(0, 50) : null,
+        location:     location ? String(location).slice(0, 255) : null,
+        description:  description  ? String(description).slice(0, 10000) : null,
+        requirements: requirements ? String(requirements).slice(0, 10000) : null,
         status: 'open',
         created_by: req.user.id,
       },
@@ -132,12 +137,12 @@ router.put('/:id', authenticateToken, authorizeRoles('admin', 'company'), async 
     await prisma.job.update({
       where: { id: existing.id },
       data: {
-        title,
-        company,
-        ctc,
-        location,
-        description,
-        requirements,
+        title:        title       ? String(title).slice(0, 255) : undefined,
+        company:      company     ? String(company).slice(0, 255) : undefined,
+        ctc:          ctc         ? String(ctc).slice(0, 50) : ctc,
+        location:     location    ? String(location).slice(0, 255) : location,
+        description:  description ? String(description).slice(0, 10000) : description,
+        requirements: requirements ? String(requirements).slice(0, 10000) : requirements,
         status: status || 'open',
       },
     })

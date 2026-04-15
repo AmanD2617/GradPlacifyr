@@ -53,7 +53,7 @@ export async function uploadCompanyLogo(file: File): Promise<{ logoUrl: string }
 
   const res = await fetch(`${API_BASE}/company-profile/logo`, {
     method: 'POST',
-    credentials: 'include',
+    credentials: 'include', // HttpOnly cookie auth
     body: formData,
   })
 
@@ -63,7 +63,7 @@ export async function uploadCompanyLogo(file: File): Promise<{ logoUrl: string }
     const message =
       typeof data === 'string'
         ? data
-        : data?.error?.message || data?.error || 'Logo upload failed'
+        : (data as any)?.error?.message || (data as any)?.error || 'Logo upload failed'
     throw new Error(message)
   }
 

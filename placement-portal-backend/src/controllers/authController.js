@@ -1,4 +1,5 @@
-import jwt from 'jsonwebtoken'
+import { JWT_SECRET, getTokenCookieOptions } from '../middleware/auth.js'
+import prisma from '../db/prisma.js'
 import {
   createPasswordResetRequest,
   getUserById,
@@ -7,33 +8,28 @@ import {
   resetPasswordWithToken,
   googleAuth,
   completeGoogleRegistration,
+  buildJwtPublic,
   sendOtp,
   verifyOtp,
   getPendingCompanies,
   approveCompany,
   rejectCompany,
+  changePassword,
 } from '../services/authService.js'
 
-const JWT_SECRET = process.env.JWT_SECRET
-if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required')
-
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  path: '/',
-}
-
+/** Helper: set JWT as HttpOnly cookie and include in response body */
 function setAuthCookie(res, token) {
-  res.cookie('placement_token', token, COOKIE_OPTIONS)
+  res.cookie('placement_token', token, getTokenCookieOptions())
 }
 
 export async function register(req, res) {
   const result = await registerUser(req.body)
+
+  // Set cookie if token was issued (not pending accounts)
   if (result.token) {
     setAuthCookie(res, result.token)
   }
+
   res.status(201).json(result)
 }
 
@@ -43,9 +39,29 @@ export async function login(req, res) {
   res.json(result)
 }
 
-export async function logout(_req, res) {
-  res.clearCookie('placement_token', { path: '/' })
-  res.json({ ok: true })
+export async function logout(req, res) {
+  // ═══════════ INVALIDATE JWT VIA TOKEN VERSION ═══════════
+  // Incrementing token_version makes all existing JWTs for this user invalid,
+  // even if an attacker has a copy of the token (e.g., from XSS before fix).
+  if (req.user?.id) {
+    try {
+      await prisma.user.update({
+        where: { id: req.user.id },
+        data: { token_version: { increment: 1 } },
+      })
+    } catch {
+      // Non-fatal — still clear the cookie
+    }
+  }
+
+  // Clear the auth cookie
+  res.clearCookie('placement_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    path: '/',
+  })
+  res.json({ message: 'Logged out' })
 }
 
 export async function me(req, res) {
@@ -71,14 +87,12 @@ export async function resetPassword(req, res) {
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
 
 async function verifyGoogleToken(idToken) {
-  // Verify the Google ID token via Google's tokeninfo endpoint
   const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`)
   if (!res.ok) {
     throw new Error('Invalid Google token')
   }
   const payload = await res.json()
 
-  // Verify the audience matches our client ID
   if (payload.aud !== GOOGLE_CLIENT_ID) {
     throw new Error('Token audience mismatch')
   }
@@ -97,7 +111,6 @@ export async function handleGoogleAuth(req, res) {
     return res.status(400).json({ error: 'Google credential token is required' })
   }
 
-  // Verify the token server-side
   let googleUser
   try {
     googleUser = await verifyGoogleToken(credential)
@@ -112,7 +125,8 @@ export async function handleGoogleAuth(req, res) {
   })
 
   if (result.exists) {
-    const token = jwt.sign({ id: result.user.id, role: result.user.role }, JWT_SECRET, { expiresIn: '7d' })
+    // buildJwtPublic includes the tv (token_version) claim required by verifyTokenVersion()
+    const token = buildJwtPublic(result.rawUser)
     setAuthCookie(res, token)
     return res.json({ exists: true, token, user: result.user })
   }
@@ -122,11 +136,15 @@ export async function handleGoogleAuth(req, res) {
 }
 
 export async function handleCompleteGoogleRegistration(req, res) {
-  const { googleId, email, name, phone } = req.body ?? {}
-  const result = await completeGoogleRegistration({ googleId, email, name, phone })
+  const { googleId, email, name, phone, verificationToken } = req.body ?? {}
+
+  // completeGoogleRegistration now requires the OTP verification token
+  const result = await completeGoogleRegistration({ googleId, email, name, phone, verificationToken })
+
   if (result.token) {
     setAuthCookie(res, result.token)
   }
+
   res.status(201).json(result)
 }
 
@@ -141,6 +159,15 @@ export async function handleSendOtp(req, res) {
 export async function handleVerifyOtp(req, res) {
   const { email, code } = req.body ?? {}
   const result = await verifyOtp(email, code)
+  // result now includes { verified: true, verificationToken }
+  res.json(result)
+}
+
+// ═══════════ AUTHENTICATED PASSWORD CHANGE ═══════════
+
+export async function handleChangePassword(req, res) {
+  const { currentPassword, newPassword } = req.body ?? {}
+  const result = await changePassword(req.user.id, { currentPassword, newPassword })
   res.json(result)
 }
 

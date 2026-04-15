@@ -53,9 +53,13 @@ model User {
   profile_image        String?        @db.VarChar(500)
   google_id            String?        @unique @db.VarChar(255)
   status               account_status @default(active)
-  reset_password_token String?        @db.VarChar(255)
+  reset_password_token  String?       @db.VarChar(255)
   reset_password_expire DateTime?     @db.Timestamptz()
-  created_at           DateTime       @default(now()) @db.Timestamptz()
+  // Security fields
+  token_version         Int           @default(1)        // Incremented on logout/password-change to invalidate existing JWTs
+  failed_login_attempts Int           @default(0)        // Per-account brute-force protection
+  locked_until          DateTime?     @db.Timestamptz()  // Account lockout expiry
+  created_at            DateTime      @default(now()) @db.Timestamptz()
 
   // Relations
   jobs             Job[]              @relation("JobCreator")
@@ -74,6 +78,7 @@ model Otp {
   code       String   @db.VarChar(10)
   expires_at DateTime @db.Timestamptz()
   used       Boolean  @default(false)
+  attempts   Int      @default(0)  // Tracks failed verification attempts for brute-force protection
   created_at DateTime @default(now()) @db.Timestamptz()
 
   @@index([email, code])
