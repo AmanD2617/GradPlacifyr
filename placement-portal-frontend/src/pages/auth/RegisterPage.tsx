@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import './Auth.css'
 import { useAuth, type Role } from '../../context/AuthContext'
 import { register as apiRegister } from '../../api/auth'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 
 // ═══════════ Validation Rules (mirrored from backend) ═══════════
 
@@ -159,8 +160,6 @@ const RegisterPage = () => {
                 >
                   <option value="student">Student</option>
                   <option value="recruiter">Recruiter</option>
-                  <option value="tpo">TPO</option>
-                  <option value="admin">Admin</option>
                 </select>
               </label>
 
@@ -226,8 +225,7 @@ const RegisterPage = () => {
 
               <label className="auth-label">
                 <span>Password <span className="auth-required">*</span></span>
-                <input
-                  type="password"
+                <PasswordInput
                   className={`auth-input ${fieldError('password', password) ? 'auth-input-error' : ''}`}
                   placeholder="Min 8 chars, Aa1@"
                   value={password}

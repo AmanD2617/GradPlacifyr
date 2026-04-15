@@ -106,7 +106,7 @@ const StudentUploadResumePage = () => {
       setParsing(true)
       const result = await parseResume(file)
       setParsedProfile(result)
-      localStorage.setItem('parsed_resume_profile', JSON.stringify(result))
+      sessionStorage.setItem('parsed_resume_profile', JSON.stringify(result))
       setMessage('AI has suggested skills and experience from your resume. Review them below and on the Edit Profile page.')
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : 'Failed to parse resume.'
@@ -156,7 +156,16 @@ const StudentUploadResumePage = () => {
     const win = window.open('', '_blank')
     if (!win) return
 
-    const safe = (value: string) => value ?? ''
+    // Escape HTML entities to prevent XSS when writing API data to a new window
+    const safe = (value: string): string => {
+      const str = value ?? ''
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+    }
 
     win.document.write('<html><head><title>AI Resume</title>')
     win.document.write(

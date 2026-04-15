@@ -38,6 +38,7 @@ import TpoMonitorApplicationsPage from './pages/tpo/TpoMonitorApplicationsPage'
 import TpoReportsPage from './pages/tpo/TpoReportsPage'
 import AdminManageStudentsPage from './pages/admin/AdminManageStudentsPage'
 import AdminManageCompaniesPage from './pages/admin/AdminManageCompaniesPage'
+import AdminManageTPOPage from './pages/admin/AdminManageTPOPage'
 import RecruiterProfile from './pages/recruiter/RecruiterProfile'
 import RecruiterChangePassword from './pages/recruiter/RecruiterChangePassword'
 import AdminProfile from './pages/admin/AdminProfile'
@@ -134,6 +135,7 @@ function App() {
               <Route path="/admin/change-password" element={<AdminChangePassword />} />
               <Route path="/admin/manage-students" element={<AdminManageStudentsPage />} />
               <Route path="/admin/manage-companies" element={<AdminManageCompaniesPage />} />
+              <Route path="/admin/manage-tpo" element={<AdminManageTPOPage />} />
               <Route path="/admin/approve-jobs" element={<TpoApproveJobsPage />} />
               <Route path="/admin/monitor-applications" element={<TpoMonitorApplicationsPage />} />
               <Route path="/admin/reports" element={<TpoReportsPage />} />

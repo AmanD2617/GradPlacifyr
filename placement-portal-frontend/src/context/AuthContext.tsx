@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login as apiLogin, logout as apiLogout, type User as ApiUser, type Role } from '../api/auth'
 
@@ -41,6 +41,7 @@ function toUser(u: ApiUser): User {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Initialize from cached user metadata for fast display (non-sensitive — no token stored)
   const [user, setUser] = useState<User | null>(() => {
     // Only non-sensitive user metadata (id, name, email, role) is kept in
     // localStorage for UI state persistence. The JWT is stored exclusively
@@ -50,6 +51,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   const navigate = useNavigate()
+
+  // On mount, verify the session cookie is still valid via /api/auth/me
+  useEffect(() => {
+    apiFetch<ApiUser>('/auth/me')
+      .then((apiUser) => {
+        const u = toUser(apiUser)
+        setUser(u)
+        localStorage.setItem('placement_user', JSON.stringify(u))
+      })
+      .catch(() => {
+        // Cookie expired or absent — clear stale user cache
+        setUser(null)
+        localStorage.removeItem('placement_user')
+      })
+  }, [])
 
   const login = useCallback(
     async (email: string, password: string, selectedRole: Role): Promise<void> => {

@@ -39,7 +39,7 @@ const StudentEditProfilePage = () => {
       })
       .finally(() => setLoading(false))
 
-    const stored = localStorage.getItem('parsed_resume_profile')
+    const stored = sessionStorage.getItem('parsed_resume_profile')
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as ParsedResumeProfile

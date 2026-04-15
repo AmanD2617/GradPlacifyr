@@ -51,7 +51,7 @@ const StudentProfile = () => {
       })
       .finally(() => setLoading(false))
 
-    const stored = localStorage.getItem('parsed_resume_profile')
+    const stored = sessionStorage.getItem('parsed_resume_profile')
     if (stored) {
       try {
         setResumeSuggestions(JSON.parse(stored) as ParsedResumeProfile)

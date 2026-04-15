@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { GraduationCap, Briefcase, Shield, BookOpenCheck } from 'lucide-react'
+import { GraduationCap, Briefcase } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import './Auth.css'
 
@@ -33,24 +33,6 @@ const roles: RoleOption[] = [
     icon: Briefcase,
     iconBg: '#059669',
     borderColor: '#059669',
-  },
-  {
-    key: 'tpo',
-    label: 'TPO',
-    subtitle: 'Training & placement operations',
-    accent: 'tpo',
-    icon: BookOpenCheck,
-    iconBg: '#0369a1',
-    borderColor: '#0369a1',
-  },
-  {
-    key: 'admin',
-    label: 'Admin',
-    subtitle: 'System and user management',
-    accent: 'admin',
-    icon: Shield,
-    iconBg: '#7c3aed',
-    borderColor: '#7c3aed',
   },
 ]
 
