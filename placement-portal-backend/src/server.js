@@ -17,6 +17,7 @@ import uploadRoutes from './routes/upload.js'
 import roundsRoutes from './routes/rounds.js'
 import companyProfileRoutes from './routes/companyProfile.js'
 import filesRoutes from './routes/files.js'
+import ssoRoutes from './routes/sso.js'
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js'
 import { authenticateToken } from './middleware/auth.js'
 
@@ -112,6 +113,7 @@ app.use('/api/events', eventsRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/rounds', roundsRoutes)
 app.use('/api/company-profile', companyProfileRoutes)
+app.use('/api/sso', ssoRoutes)
 
 // Health check — authenticated to prevent external probing
 app.get('/api/health', authenticateToken, (_req, res) => {

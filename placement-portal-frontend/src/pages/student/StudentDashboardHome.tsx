@@ -18,6 +18,7 @@ import { getJobs, type Job } from '../../api/jobs'
 import { getMyApplications, type StudentApplication } from '../../api/applications'
 import { getMyProfile, type StudentProfile } from '../../api/profile'
 import { getRoleTheme } from '../../utils/roleConfig'
+import { API_BASE } from '../../config'
 import {
   ActivityTimeline,
   DashboardLayout,
@@ -203,6 +204,25 @@ const StudentDashboardHome = () => {
 
   const roleTheme = getRoleTheme('student')
 
+  // ── SSO: launch AI MCQ practice in AIMCQTest ────────────────────────────
+  const handleAiMockInterview = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/sso/generate-ticket`, {
+        method: 'POST',
+        credentials: 'include', // send the HttpOnly auth cookie
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        console.error('SSO ticket generation failed:', body)
+        return
+      }
+      const { redirectUrl } = await res.json()
+      window.location.href = redirectUrl
+    } catch (err) {
+      console.error('Failed to launch AI practice session:', err)
+    }
+  }
+
   return (
     <DashboardLayout
       greeting={`Welcome back, ${user?.name ?? 'Student'}`}
@@ -353,6 +373,7 @@ const StudentDashboardHome = () => {
             title="AI Mock Interview"
             description="Practice role-based questions"
             icon={Sparkles}
+            onClick={handleAiMockInterview}
           />
         </div>
       }

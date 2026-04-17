@@ -68,6 +68,7 @@ model User {
   companyProfile   CompanyProfile?    @relation("CompanyProfileRel")
   events           Event[]            @relation("EventCreator")
   roundCandidates  RoundCandidate[]   @relation("UserRoundCandidates")
+  ssoTickets       SsoTicket[]        @relation("UserSsoTickets")
 
   @@map("users")
 }
@@ -203,6 +204,19 @@ model CompanyProfile {
   user User @relation("CompanyProfileRel", fields: [user_id], references: [id])
 
   @@map("company_profiles")
+}
+
+model SsoTicket {
+  id         Int      @id @default(autoincrement())
+  ticket     String   @unique @db.VarChar(64)
+  user_id    Int
+  expires_at DateTime @db.Timestamptz()
+  created_at DateTime @default(now()) @db.Timestamptz()
+
+  // Relations
+  user User @relation("UserSsoTickets", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("sso_tickets")
 }
 
 model Event {
