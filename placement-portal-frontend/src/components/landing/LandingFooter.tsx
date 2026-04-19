@@ -132,18 +132,24 @@ const LandingFooter = () => {
             </ul>
 
             {/* Map */}
-            <div className="overflow-hidden rounded-xl border border-white/10">
+            <div className="group relative w-full overflow-hidden rounded-xl border border-white/10 bg-white/5">
               <iframe
                 title="JIMS Rohini Sector-5 Location"
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3499.0179253573906!2d77.1087901!3d28.719010299999997!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390d014e7953d073%3A0xa1df99c8551f3812!2sJagan%20Institute%20of%20Management%20Studies%20-%20JIMS%20Rohini!5e0!3m2!1sen!2sin!4v1774938761292!5m2!1sen!2sin"
-                width="100%"
-                height="140"
-                style={{ border: 0 }}
-                allowFullScreen={false}
+                src="https://www.google.com/maps?q=Jagan+Institute+of+Management+Studies+JIMS+Rohini+Sector+5&output=embed"
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                className="grayscale transition-all duration-500 hover:grayscale-0"
+                allowFullScreen={false}
+                className="block h-40 w-full border-0 grayscale transition-all duration-500 group-hover:grayscale-0"
               />
+              <a
+                href="https://www.google.com/maps/search/?api=1&query=Jagan+Institute+of+Management+Studies+JIMS+Rohini+Sector+5"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-gray-900/80 py-1.5 text-[11px] font-medium text-gray-200 opacity-0 backdrop-blur-sm transition-opacity duration-300 group-hover:opacity-100"
+              >
+                <MapPin className="h-3 w-3" />
+                Open in Google Maps
+              </a>
             </div>
           </div>
         </div>

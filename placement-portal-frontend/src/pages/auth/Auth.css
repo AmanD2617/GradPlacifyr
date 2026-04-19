@@ -24,6 +24,43 @@
   color: var(--jims-maroon);
 }
 
+.auth-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.auth-role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #64748b;
+  white-space: nowrap;
+  transition: background-color 200ms ease;
+}
+
+.auth-role-badge--student {
+  background: #2563eb;
+}
+.auth-role-badge--recruiter {
+  background: #059669;
+}
+.auth-role-badge--tpo {
+  background: #0369a1;
+}
+.auth-role-badge--admin {
+  background: #7c3aed;
+}
+
 .auth-subtitle {
   margin: 0 0 1.5rem;
   font-size: 0.95rem;
