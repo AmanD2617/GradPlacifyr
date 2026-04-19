@@ -20,6 +20,7 @@ import filesRoutes from './routes/files.js'
 import ssoRoutes from './routes/sso.js'
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js'
 import { authenticateToken } from './middleware/auth.js'
+import { seedDefaultAdmin } from './db/seedAdmin.js'
 
 // ═══════════ STARTUP CHECKS ═══════════
 if (!process.env.JWT_SECRET) {
@@ -125,4 +126,14 @@ app.use(errorHandler)
 
 app.listen(PORT, async () => {
   console.log(`Server running at http://localhost:${PORT}`)
+
+  // ═══════════ DEFAULT ADMIN BOOTSTRAP ═══════════
+  // Runs once per boot. No-op if an admin already exists. Wrapped in a try/catch
+  // because a seeder failure (e.g., transient DB hiccup) should never prevent
+  // the API from serving requests — existing users still need to log in.
+  try {
+    await seedDefaultAdmin()
+  } catch (err) {
+    console.error('[seedAdmin] Failed to seed default admin:', err?.message || err)
+  }
 })

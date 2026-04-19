@@ -74,9 +74,40 @@ function toDbRole(appRole) {
   return APP_TO_DB_ROLE[appRole] || appRole
 }
 
+/**
+ * Roles that MUST NEVER be creatable via the public registration endpoint.
+ *
+ * - `admin`: seeded once at startup via DEFAULT_ADMIN_EMAIL/PASSWORD; all
+ *   subsequent admins would be a privilege-escalation risk.
+ * - `tpo` / `hod`: TPO accounts are provisioned only by an existing Admin
+ *   from inside the Admin dashboard. The public UI hides these options,
+ *   but this guard is the authoritative enforcement point — it defends
+ *   against anyone calling POST /api/auth/register directly (curl/Postman)
+ *   with a crafted payload.
+ *
+ * Kept as a lowercased set so case-variant payloads (`"ADMIN"`, `"Tpo"`,
+ * etc.) are also rejected.
+ */
+const PRIVILEGED_ROLES = new Set(['admin', 'tpo', 'hod'])
+
 // ═══════════ REGISTRATION ═══════════
 
 export async function registerUser({ email, password, role, name, phone, enrollmentNumber }) {
+  // ═══════════ PRIVILEGED ROLE GUARD ═══════════
+  // Reject any attempt to self-register as an admin or TPO via the public
+  // endpoint. This runs BEFORE the generic validator so the caller never
+  // sees a VALIDATION_ERROR that might leak which fields are required for
+  // these roles. Returning 403 also signals to honest clients that this
+  // action is forbidden regardless of payload correctness.
+  const normalizedRole = typeof role === 'string' ? role.trim().toLowerCase() : ''
+  if (PRIVILEGED_ROLES.has(normalizedRole)) {
+    throw new AppError(
+      'This role cannot be created through public registration. Contact your administrator.',
+      403,
+      'ROLE_NOT_ALLOWED'
+    )
+  }
+
   const validationError = validateRegistration({ email, password, role, name, phone, enrollmentNumber })
   if (validationError) {
     throw new AppError(validationError, 400, 'VALIDATION_ERROR')
