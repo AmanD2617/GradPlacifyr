@@ -50,7 +50,10 @@ app.use(helmet({
       frameAncestors: ["'none'"],
     },
   },
-  crossOriginEmbedderPolicy: false, // Allow cross-origin images
+  crossOriginEmbedderPolicy: false,
+  // Frontend is served from a different origin than the API; without this,
+  // Helmet's default CORP=same-origin blocks <img src="http://api/uploads/..."/>
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }))
 
 // CORS: configurable via env, supports credentials (cookies)

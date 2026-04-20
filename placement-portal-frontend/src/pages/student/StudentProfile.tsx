@@ -37,6 +37,8 @@ const StudentProfile = () => {
   const [resumeSuggestions, setResumeSuggestions] = useState<ParsedResumeProfile | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [avatarVersion, setAvatarVersion] = useState(0)
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -149,8 +151,25 @@ const StudentProfile = () => {
     try {
       setUploadingImage(true)
       setError(null)
+      setAvatarLoadFailed(false)
       const res = await uploadAvatar(file)
+
+      // Preload the new image BEFORE clearing the blob preview so we never
+      // render a broken state. Avoids the race where the <img> tries to load
+      // right as multer is finishing the disk write, which the browser can
+      // then cache as a failure.
+      const fullUrl = resolveFileUrl(res.profileImage)
+      if (fullUrl) {
+        await new Promise<void>((resolve) => {
+          const probe = new Image()
+          probe.onload = () => resolve()
+          probe.onerror = () => resolve() // don't block UX on probe failure
+          probe.src = `${fullUrl}?v=${Date.now()}`
+        })
+      }
+
       updateProfileImage(res.profileImage)
+      setAvatarVersion((v) => v + 1) // cache-bust the rendered <img>
       setImagePreview(null)
       setMessage('Profile image updated!')
     } catch (err: unknown) {
@@ -169,6 +188,8 @@ const StudentProfile = () => {
       setError(null)
       await deleteAvatar()
       updateProfileImage(null)
+      setAvatarLoadFailed(false)
+      setAvatarVersion((v) => v + 1)
       setMessage('Profile image removed.')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to remove image'
@@ -178,8 +199,14 @@ const StudentProfile = () => {
     }
   }
 
-  const currentImageUrl = imagePreview
-    || resolveFileUrl(user?.profileImage)
+  // Resolve the avatar URL. Append a cache-busting query param for server
+  // URLs (not blob: previews) so the browser re-fetches after an upload.
+  const resolvedAvatarUrl = resolveFileUrl(user?.profileImage)
+  const cacheBustedAvatarUrl =
+    resolvedAvatarUrl && avatarVersion > 0
+      ? `${resolvedAvatarUrl}${resolvedAvatarUrl.includes('?') ? '&' : '?'}v=${avatarVersion}`
+      : resolvedAvatarUrl
+  const currentImageUrl = imagePreview || cacheBustedAvatarUrl
 
   const initials = (() => {
     if (!user?.name) return '?'
@@ -276,11 +303,14 @@ const StudentProfile = () => {
         {/* ── Profile Image ── */}
         <div className="up-avatar-section">
           <div className="up-avatar-wrapper">
-            {currentImageUrl ? (
+            {currentImageUrl && !avatarLoadFailed ? (
               <img
+                key={currentImageUrl} /* force remount when URL changes so we don't inherit a cached failure */
                 src={currentImageUrl}
-                alt="Profile"
+                alt={user?.name || 'Profile'}
                 className="up-avatar-img"
+                onLoad={() => setAvatarLoadFailed(false)}
+                onError={() => setAvatarLoadFailed(true)}
               />
             ) : (
               <div className="up-avatar-placeholder">

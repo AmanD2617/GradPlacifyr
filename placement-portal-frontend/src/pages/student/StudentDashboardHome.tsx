@@ -66,21 +66,45 @@ const StudentDashboardHome = () => {
   const [profile, setProfile] = useState<StudentProfile | null>(null)
 
   useEffect(() => {
-    Promise.all([getJobs(), getMyApplications(), getMyProfile()])
-      .then(([allJobs, myApplications, myProfile]) => {
-        setJobs(allJobs)
-        setApplications(myApplications)
-        setProfile(myProfile)
+    let cancelled = false
+    setError(null)
+
+    // Use allSettled so a transient failure on ONE endpoint doesn't blank
+    // the whole dashboard. We only surface a top-level error if every
+    // request failed (true "API is down" scenario).
+    Promise.allSettled([getJobs(), getMyApplications(), getMyProfile()])
+      .then(([jobsRes, appsRes, profileRes]) => {
+        if (cancelled) return
+
+        if (jobsRes.status === 'fulfilled') setJobs(jobsRes.value)
+        if (appsRes.status === 'fulfilled') setApplications(appsRes.value)
+        if (profileRes.status === 'fulfilled') setProfile(profileRes.value)
+
+        const failures = [jobsRes, appsRes, profileRes].filter(
+          (r): r is PromiseRejectedResult => r.status === 'rejected'
+        )
+
+        if (failures.length === 3) {
+          const raw = failures[0].reason instanceof Error
+            ? failures[0].reason.message
+            : 'Failed to load dashboard data'
+          setError(
+            raw === 'Failed to fetch'
+              ? 'Cannot reach the placement API. Please check that the backend server is running.'
+              : raw
+          )
+        } else if (failures.length > 0) {
+          // Partial failure — log silently; the visible sections will just show empty state.
+          console.warn('[dashboard] Partial load failure:', failures.map((f) => f.reason))
+        }
       })
-      .catch((err: unknown) => {
-        const raw = err instanceof Error ? err.message : 'Failed to load dashboard data'
-        const friendly =
-          raw === 'Failed to fetch'
-            ? 'Cannot reach the placement API. Please check that the backend server is running.'
-            : raw
-        setError(friendly)
+      .finally(() => {
+        if (!cancelled) setLoading(false)
       })
-      .finally(() => setLoading(false))
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const openJobs = useMemo(() => jobs.filter((j) => j.status === 'open'), [jobs])

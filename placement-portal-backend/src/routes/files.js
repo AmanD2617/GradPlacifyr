@@ -1,8 +1,12 @@
 /**
- * Authenticated file serving — replaces express.static for /uploads.
+ * File serving — replaces express.static for /uploads.
  *
- * All files require authentication. Resumes have additional ownership checks.
- * Avatars and logos are accessible to any authenticated user (display assets).
+ * Avatars and logos are served publicly because browsers do not forward
+ * auth cookies on `<img>` subresource requests across sites — gating them
+ * behind auth made profile images unrenderable in cross-origin deployments.
+ * Filenames are unguessable UUIDs, so enumeration is not a concern.
+ *
+ * Resumes remain behind auth with an ownership check.
  */
 import { Router } from 'express'
 import path from 'path'
@@ -17,9 +21,6 @@ const __dirname = path.dirname(__filename)
 const UPLOADS_ROOT = path.resolve(__dirname, '..', '..', 'uploads')
 
 const router = Router()
-
-// All file routes require authentication
-router.use(authenticateToken)
 
 /**
  * Safely resolve a file path and ensure it doesn't escape the uploads directory.
@@ -38,7 +39,7 @@ function safeResolvePath(subdir, filename) {
   return resolved
 }
 
-// GET /uploads/avatars/:filename — any authenticated user
+// GET /uploads/avatars/:filename — public (UUID-gated, embedded in <img>)
 router.get('/avatars/:filename', (req, res) => {
   const filePath = safeResolvePath('avatars', req.params.filename)
   if (!filePath || !fs.existsSync(filePath)) {
@@ -47,7 +48,7 @@ router.get('/avatars/:filename', (req, res) => {
   res.sendFile(filePath)
 })
 
-// GET /uploads/logos/:filename — any authenticated user
+// GET /uploads/logos/:filename — public (UUID-gated, embedded in <img>)
 router.get('/logos/:filename', (req, res) => {
   const filePath = safeResolvePath('logos', req.params.filename)
   if (!filePath || !fs.existsSync(filePath)) {
@@ -57,7 +58,7 @@ router.get('/logos/:filename', (req, res) => {
 })
 
 // GET /uploads/resumes/:filename — ownership check for students
-router.get('/resumes/:filename', async (req, res) => {
+router.get('/resumes/:filename', authenticateToken, async (req, res) => {
   const filePath = safeResolvePath('resumes', req.params.filename)
   if (!filePath || !fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'File not found' })

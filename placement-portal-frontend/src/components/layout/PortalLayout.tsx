@@ -248,9 +248,14 @@ const PortalLayout = () => {
                 <CompletionRing percent={completion} size={44} />
                 {user?.profileImage ? (
                   <img
+                    key={user.profileImage} /* remount on change so a stale cached failure doesn't persist */
                     src={resolveFileUrl(user.profileImage) || ''}
                     alt={user.name}
                     className="portal-avatar-img"
+                    onError={(e) => {
+                      // Hide broken image and let the initials fallback show instead
+                      e.currentTarget.style.display = 'none'
+                    }}
                   />
                 ) : (
                   <span className="portal-avatar-initials">{initials}</span>
