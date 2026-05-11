@@ -7,8 +7,9 @@ import { AppError } from '../utils/appError.js'
 const router = Router()
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+  apiKey: process.env.OPENAI_API_KEY || "ollama",
+  baseURL: process.env.OPENAI_BASE_URL,
+});
 
 function ensureOpenAIConfigured() {
   if (!process.env.OPENAI_API_KEY) {
