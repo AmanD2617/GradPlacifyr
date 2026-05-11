@@ -59,7 +59,7 @@ app.use(helmet({
 // CORS: configurable via env, supports credentials (cookies)
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['http://localhost:5173']
+  : ['https://gradplacifyr.kodeforgelabs.com']
 
 app.use(cors({
   origin: (origin, callback) => {
